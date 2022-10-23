@@ -31,6 +31,7 @@ class BuffEffectType(IntEnum):
 class BuffType(IntEnum):
 	TenRouHaDanKen			= 100001	#天楼霸断剑特殊buff
 	Akriasworld				= 100002	#晶的特殊技能
+	Imangry					= 100003    #ophelia的特殊技能
 
 	NormalAttrAtkUp			= 10101
 	NormalAttrAtkDown		= 10102
@@ -65,6 +66,14 @@ Buff = {
 	BuffType.TenRouHaDanKen:{
 		'name':'天楼霸断剑',
 		'text':'矛依未拔出了她的大剑，改变技能组并提升{0}点攻击距离，持续全场',
+		'trigger_type':BuffTriggerType.NormalSelf,
+		'effect_type':BuffEffectType.Attr,
+
+		'attr_type':Attr.DISTANCE,
+	},
+	BuffType.Imangry:{
+		'name':'我生气了',
+		'text':'Ophelia生气了!接下来她的行动速度将会大幅加快',
 		'trigger_type':BuffTriggerType.NormalSelf,
 		'effect_type':BuffEffectType.Attr,
 

@@ -1067,7 +1067,7 @@ ROLE = {
         "health": 800,
         "distance": 15,
         "attack": 150,
-        "defensive": 50,
+        "defensive": 60,
         "crit": 0,
         "tp": 0,
 
@@ -1097,7 +1097,7 @@ ROLE = {
             },
             {
                 "name": "冰枪术",
-                "text": "对目标造成20(+1.5自身攻击力)伤害",
+                "text": "对目标造成20(+1.5自身攻击力)伤害，并将所造成伤害的20%转为生命值",
                 "tp_cost": 30,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
@@ -1108,7 +1108,7 @@ ROLE = {
             },
             {
                 "name": "宇宙苍蓝闪",
-                "text": "无视距离，对目标造成50(+2.2自身攻击力)伤害，并将所造成伤害的20%转为生命值。",
+                "text": "无视距离，对目标造成70(+2.2自身攻击力)伤害，并将所造成伤害的20%转为生命值",
                 "tp_cost": 70,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [0],
@@ -2149,24 +2149,25 @@ ROLE = {
     },
     5101: {
         "name": "phelia",
-        "health": 1100,
-        "distance": 10,
+        "health": 1000,
+        "distance": 8,
         "attack": 100,
-        "defensive": 80,
+        "defensive": 70,
         "crit": 10,
         "tp": 0,
 
         "active_skills": [
             {
                 "name": "攻击!",
-                "text": "对目标造成0(+1.5自身攻击力)伤害,若令目标出局则获得一个额外回合",
+                "text": "对目标造成0(+1.5自身攻击力)伤害,并将造成伤害的30%转化为生命值。若令目标出局则获得40tp",
                 "tp_cost": 0,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
                 "effect": {
                     EFFECT_HURT: (0, Attr.ATTACK, 0, 1.5, False),
-                    EFFECT_OUT_LOCKTURN: 1
+                    EFFECT_LIFESTEAL: 0.3,
+                    EFFECT_OUT_TP: 40,
                 }
             },
             {
@@ -2203,15 +2204,15 @@ ROLE = {
             },
             {
                 "name": "我要生气了!",
-                "text": "立即触发当前所处位置的跑道事件，在本回合及下一个自我回合内，攻击距离增加5，每次使用技能2或3时将获得一个额外回合",
+                "text": "立即触发当前所处位置的跑道事件，攻击力增加100，并在接下来的2个自我回合内，额外获得40%暴击率，每次使用技能2或3时将获得一个额外回合",
                 "tp_cost": 45,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 
                 "effect": {
                     EFFECT_MOVE: 0,
-                    EFFECT_LOCKTURN: 1,
-                    EFFECT_BUFF: [(BuffType.Imangry, 5, 1)],
+                    EFFECT_ATTR_CHANGE: [(Attr.ATTACK, 100, 0, 0)],
+                    EFFECT_BUFF: [(BuffType.Imangry, 40, 2)],
                 }
             },
         ],

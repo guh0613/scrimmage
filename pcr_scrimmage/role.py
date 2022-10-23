@@ -1104,6 +1104,7 @@ ROLE = {
 
                 "effect": {
                     EFFECT_HURT: (20, Attr.ATTACK, 0, 1.5, False)
+                    EFFECT_LIFESTEAL: 0.2,
                 }
             },
             {
@@ -1114,7 +1115,7 @@ ROLE = {
                 "passive": [0],
 
                 "effect": {
-                    EFFECT_HURT: (50, Attr.ATTACK, 0, 2.2, False),
+                    EFFECT_HURT: (70, Attr.ATTACK, 0, 2.2, False),
                     EFFECT_LIFESTEAL: 0.2,
                 }
             }

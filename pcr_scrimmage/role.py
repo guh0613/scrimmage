@@ -2203,15 +2203,14 @@ ROLE = {
             },
             {
                 "name": "我要生气了!",
-                "text": "立即触发当前所处位置的跑道事件，在本回合及下一个自我回合内，攻击距离增加5，每次使用技能2或3时将获得一个额外回合",
+                "text": "立即触发当前所处位置的跑道事件，在接下来的2个自我回合内，攻击力增加100，每次使用技能2或3时将获得一个额外回合",
                 "tp_cost": 45,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 
                 "effect": {
                     EFFECT_MOVE: 0,
-                    EFFECT_LOCKTURN: 1,
-                    EFFECT_BUFF: [(BuffType.Imangry, 5, 1)],
+                    EFFECT_BUFF: [(BuffType.Imangry, 100, 2)],
                 }
             },
         ],

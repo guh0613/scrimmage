@@ -77,7 +77,7 @@ Buff = {
 		'trigger_type':BuffTriggerType.NormalSelf,
 		'effect_type':BuffEffectType.Attr,
 
-		'attr_type':Attr.DISTANCE,
+		'attr_type':Attr.ATTACK,
 	},
 	BuffType.Akriasworld:{
 		'name':'万物改造',

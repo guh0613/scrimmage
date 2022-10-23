@@ -80,8 +80,8 @@ usage：
 	4、投降 / 认输
 """.strip()
 __plugin_des__ = "进行一场激动人心的大乱斗"
-__plugin_type__ = ("群内小游戏",)
 __plugin_cmd__ = ["大乱斗规则", "创建大乱斗"]
+__plugin_type__ = ("群内小游戏",)
 __plugin_settings__ = {
     "level": 5,  # 群权限等级，请不要设置为1或999，若无特殊情况请设置为5
     "default_status": True,  # 进群时的默认开关状态
@@ -616,6 +616,52 @@ class PCRScrimmage:
 
 		await self.caseTrigger(player, bot, ev)
 
+		# 技能触发跑道事件
+	def skillcaseTrigger(self, player: Role, back_msg):
+		case_num = self.runway[player.now_location]["case"]
+		str1, num = "", 0
+		if case_num == CASE_NONE:
+			pass
+		elif case_num == CASE_HEALTH:
+			numRange = RUNWAY_CASE[CASE_HEALTH]["range"]
+			num = random.choice(range(numRange[0], numRange[1]))
+			player.attrChange(Attr.NOW_HEALTH, num)
+		elif case_num == CASE_DEFENSIVE:
+			numRange = RUNWAY_CASE[CASE_DEFENSIVE]["range"]
+			num = random.choice(range(numRange[0], numRange[1]))
+			player.attrChange(Attr.DEFENSIVE, num)
+		elif case_num == CASE_ATTACK:
+			numRange = RUNWAY_CASE[CASE_ATTACK]["range"]
+			num = random.choice(range(numRange[0], numRange[1]))
+			player.attrChange(Attr.ATTACK, num)
+		elif case_num == CASE_TP:
+			numRange = RUNWAY_CASE[CASE_TP]["range"]
+			num = random.choice(range(numRange[0], numRange[1]))
+			player.attrChange(Attr.NOW_TP, num)
+		elif case_num == CASE_MOVE:
+			numRange = RUNWAY_CASE[CASE_MOVE]["range"]
+			num = random.choice(range(numRange[0], numRange[1]))
+			if num == 0: num += 1
+			player.locationChange(num, self.runway)
+
+		if num > 0:
+			if case_num == CASE_MOVE:
+				str1 = "前"
+			else:
+				str1 = "增加"
+		else:
+			if case_num == CASE_MOVE:
+				str1 = "后"
+			else:
+				str1 = "减少"
+		text = "触发事件，"
+		text += RUNWAY_CASE[case_num]["text"].format(str1, abs(num))
+		if case_num != CASE_NONE and num == 0:
+			text += "，所以什么都不会发生"
+		elif case_num == CASE_NONE:
+			text = "什么也没发生"
+		back_msg.append(text)
+		return back_msg
 	#触发跑道事件
 	async def caseTrigger(self, player:Role, bot, ev:GroupMessageEvent):
 		case_num = self.runway[player.now_location]["case"]
@@ -874,10 +920,13 @@ class PCRScrimmage:
 		if EFFECT_MOVE in skill_effect:
 			num = skill_effect[EFFECT_MOVE]
 			goal_player.locationChange(num, self.runway)
+
 			if num < 0:
 				back_msg.append(f'{goal_player_name}后退了{abs(num)}步')
+				back_msg = self.skillcaseTrigger(goal_player, back_msg)
 			else:
 				back_msg.append(f'{goal_player_name}前进了{num}步')
+				back_msg = self.skillcaseTrigger(goal_player, back_msg)
 
 		#buff效果
 		if EFFECT_BUFF in skill_effect:

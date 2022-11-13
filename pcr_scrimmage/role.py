@@ -64,6 +64,7 @@ EFFECT_BUFF_BY_BT = "buff_by_bt"  # buff效果触发(通过buff类型)	list[Buff
 # EFFECT_BUFF_BY_BT需要EFFECT_BUFF作为前置
 EFFECT_ATTR_CHANGE = "attr"  # 属性改变，正数为增加，负数为减少	list[tuple,tuple] [(属性类型，数值，加成类型，加成比例), (...)]
 # 属性类型/加成类型：attr.py , 为0时无加成
+EFFECT_DEL_BUFF = "del_buff"
 
 EFFECT_MOVE = "move"  # 移动，正数为前进负数为后退（触发跑道事件）	number
 EFFECT_MOVE_GOAL = "move_goal"  # 向目标移动（一个技能有多个效果且包括向目标移动，向目标移动效果必须最先触发） tuple元组(移动距离，是否无视攻击范围)
@@ -78,6 +79,7 @@ EFFECT_SKILL_CHANGE = "skill_change"  # 更改技能			tuple	(BuffType.xx, [被�
 EFFECT_JUMP = "jump"  # 选择目标的移动效果，移动到目标身边，参数随便填，不会用到
 # 效果相对比较特殊，最好放在被动且搭配TRIGGER_SELECT_EXCEPT_ME使用
 
+EFFECT_TP_LOCKTURN = "tp_lockturn"
 EFFECT_OUT_TP = "make_it_out_tp"  # 令目标出局时tp变动		number
 EFFECT_OUT_LOCKTURN = "make_it_out_turn"  # 令目标出局时锁定回合	number	锁定回合：不会切换到下一个玩家，当前玩家继续丢色子和放技能
 
@@ -2149,7 +2151,7 @@ ROLE = {
     },
     5101: {
         "name": "phelia",
-        "health": 1000,
+        "health": 1200,
         "distance": 8,
         "attack": 100,
         "defensive": 70,
@@ -2204,15 +2206,17 @@ ROLE = {
             },
             {
                 "name": "我要生气了!",
-                "text": "立即触发当前所处位置的跑道事件，回复20tp，攻击力增加80，本局大乱斗剩余的时间内，暴击率提升10%，每次使用技能2或3时将获得一个额外回合",
+                "text": "立即触发当前所处位置的跑道事件，回复20tp，攻击力增加100，本局大乱斗剩余的时间内，暴击率提升10%(每局只提升一次)，每次使用技能2或3时将获得一个额外回合",
                 "tp_cost": 70,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 
                 "effect": {
                     EFFECT_MOVE: 0,
-                    EFFECT_ATTR_CHANGE: [(Attr.NOW_TP, 10, 0, 0)],
-                    EFFECT_ATTR_CHANGE: [(Attr.ATTACK, 80, 0, 0)],
+                    EFFECT_ATTR_CHANGE: [
+                        (Attr.NOW_TP, 20, 0, 0),
+                        (Attr.ATTACK, 100, 0, 0)
+                    ],
                     EFFECT_BUFF: [(BuffType.Imangry, 10, 99999)],
                 }
             },
@@ -2238,6 +2242,120 @@ ROLE = {
                         (BuffType.AttackAttrCritHurtUp, 0.2, 1)
                     ],
                     EFFECT_LOCKTURN: 1,
+                }
+            },
+        ]
+    },
+    5102: {
+        "name": "昊京",
+        "health": 1200,
+        "distance": 5,
+        "attack": 50,
+        "defensive": 85,
+        "crit": 10,
+        "tp": 0,
+
+        "active_skills": [
+            {
+                "name": "喝哎！",
+                "text": "在初始形态与答辩形态之间切换，普通形态具有更强的生存能力，答辩形态则擅长绳之以法，使用此技能时若tp已达到40则获得一个额外回合",
+                "tp_cost": 0,
+                "trigger": TRIGGER_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_ATTR_CHANGE: [
+                        (Attr.MAX_HEALTH, -200, 0, 0),
+                        (Attr.ATTACK, 80, 0, 0),
+                        (Attr.DEFENSIVE, -35, 0, 0)
+                    ],
+                    EFFECT_BUFF: [(BuffType.heai, 4, 99999)],
+                    EFFECT_SKILL_CHANGE: (BuffType.heai, [0]),
+                    EFFECT_TP_LOCKTURN: 40,
+                }
+            },
+            {
+                "name": "隐忍 / 强迫",
+                "text": "隐忍：基于已损失生命值的12%获得防御力加成，并为自己增加一个200点生命值的护盾(只可触发一次);\n" +
+                        "\t强迫：基于已损失生命值的15%获得攻击力加成",
+                "tp_cost": 20,
+                "trigger": TRIGGER_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_ATTR_CHANGE: [(Attr.DEFENSIVE, 0, Attr.COST_HEALTH, 0.12)],
+                    EFFECT_BUFF: [(BuffType.Shield, 200, 1)],
+                    EFFECT_SKILL_CHANGE: (BuffType.heai, [1]),
+                }
+            },
+            {
+                "name": "答辩方便面 / 特种兵战斗技巧",
+                "text": "答辩方便面：恢复800点生命值，并在接下来的两个回合开始时受到220点伤害\n" +
+                        "\t特种兵战斗技巧：对目标造成伤害，目标每损失1%生命值，便造成15点伤害",
+                "tp_cost": 30,
+                "trigger": TRIGGER_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_BUFF: [(BuffType.TurnAttrHelDown3, -220, 2)],
+                    EFFECT_SKILL_CHANGE: (BuffType.heai, [2]),
+                }
+            },
+            {
+                "name": "任何邪恶终将绳之以法",
+                "text": "初始形态下：自身防御力降低至0，并将所有防御力转化为攻击力，恢复等同于消耗防御力30%的tp\n" +
+                        "\t答辩形态下：自身攻击力降低至0，并对目标造成相当于所消耗攻击力3倍的伤害并击退10格，恢复等同于消耗攻击力30%的tp",
+                "tp_cost": 70,
+                "trigger": TRIGGER_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_ATTR_CHANGE: [(Attr.ATTACK, 0, Attr.DEFENSIVE, 1),
+                                         (Attr.NOW_TP, 0, Attr.DEFENSIVE, 0.3),
+                                         (Attr.DEFENSIVE, -1000, 0, 0)],
+                    EFFECT_SKILL_CHANGE: (BuffType.heai, [3,4]),
+                }
+            },
+        ],
+        "passive_skills": [
+            {
+                "trigger": TRIGGER_ME,
+                "effect": {
+                    EFFECT_ATTR_CHANGE: [
+                        (Attr.MAX_HEALTH, 200, 0, 0),
+                        (Attr.NOW_HEALTH, 100, 0, 0),
+                        (Attr.ATTACK, -80, 0, 0),
+                        (Attr.DEFENSIVE, 35, 0, 0)
+                    ],
+                    EFFECT_DEL_BUFF: [BuffType.heai],
+                    EFFECT_TP_LOCKTURN: 40,
+                }
+            },
+            {
+                "trigger": TRIGGER_ME,
+                "effect": {
+                    EFFECT_ATTR_CHANGE: [(Attr.ATTACK, 0, Attr.COST_HEALTH, 0.15)],
+                }
+            },
+            {
+                "trigger": TRIGGER_SELECT_EXCEPT_ME,
+                "effect": {
+                    EFFECT_HURT: (0, 0, 0, 0, False),
+                    EFFECT_ELIMINATE: (1, 15)
+                }
+            },
+            {
+                "trigger": TRIGGER_SELECT_EXCEPT_ME,
+                "effect": {
+                    EFFECT_HURT: (0, Attr.ATTACK, 0, 3, False),
+                    EFFECT_HIT_BACK: 10
+                }
+            },
+            {
+                "trigger": TRIGGER_ME,
+                "effect": {
+                    EFFECT_ATTR_CHANGE: [(Attr.NOW_TP, 0, Attr.ATTACK, 0.3),
+                                         (Attr.ATTACK, -1000, 0, 0)],
                 }
             },
         ]

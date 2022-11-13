@@ -46,7 +46,7 @@ from .role import (EFFECT_BUFF, EFFECT_BUFF_BY_BT, EFFECT_DIZZINESS, EFFECT_HIT_
                    EFFECT_HURT, EFFECT_ATTR_CHANGE, EFFECT_MOVE, EFFECT_MOVE_GOAL, EFFECT_LIFESTEAL,
                    EFFECT_OUT_TP, EFFECT_OUT_LOCKTURN, EFFECT_IGNORE_DIST, EFFECT_AOE, EFFECT_ELIMINATE,
                    TRIGGER_ME, TRIGGER_ALL_EXCEPT_ME, TRIGGER_ALL, TRIGGER_SELECT, TRIGGER_SELECT_EXCEPT_ME,
-                   TRIGGER_NEAR)
+                   TRIGGER_NEAR, EFFECT_DEL_BUFF, EFFECT_TP_LOCKTURN)
 
 __zx_plugin_name__ = "大乱斗"
 __plugin_usage__ = """
@@ -98,7 +98,7 @@ rule = on_fullmatch("大乱斗规则", priority=5, block=True)
 character = on_fullmatch("大乱斗角色", priority=5, block=True)
 surrend = on_fullmatch("认输", priority=5, block=True)
 skill = on_message(priority=999, block=True)
-dice = on_fullmatch('丢色子', priority=5, block=True)
+dice = on_command('丢色子', aliases={"丢"}, priority=5, block=True)
 selectcha = on_message(priority=999, block=True)
 start = on_fullmatch("开始大乱斗", priority=5, block=True)
 join = on_fullmatch("加入大乱斗", priority=5, block=True)
@@ -127,18 +127,19 @@ def uid2card(uid, user_card_dict):
 
 # 防御力计算机制。
 # 100点防御力内，每1点防御力增加0.15%伤害减免；
+# 到达100点防御力后，每一点防御力只可获得0.12%伤害减免；
 # 100点防御力后，每1点防御力增加0.05%伤害减免；
 # 最高有效防御力为1000
-# （防御力可无限提升，但最高只能获得60%伤害减免）
+# （防御力可无限提升，但最高只能获得55%伤害减免）
 def hurt_defensive_calculate(hurt, defensive):
     percent = 0.0
     if defensive <= 100:
         percent = defensive * 0.0015
     else:
         if defensive <= 1000:
-            percent = 100 * 0.0015 + (defensive - 100) * 0.0005
+            percent = 100 * 0.0012 + (defensive - 100) * 0.0005
         else:
-            percent = 100 * 0.0015 + 900 * 0.0005
+            percent = 100 * 0.001 + 900 * 0.0005
     return hurt - hurt * percent
 
 
@@ -946,6 +947,13 @@ class PCRScrimmage:
                 goal_player.addBuff(buff_info)
                 back_msg.append(f'{goal_player_name}获得buff《{buff_name}》，{buff_text}')
 
+        # 清除buff效果
+        if EFFECT_DEL_BUFF in skill_effect:
+            for bufftype in skill_effect[EFFECT_DEL_BUFF]:
+                goal_player.deleteBuff(bufftype)
+                back_msg.append(f'{goal_player_name}切换回初始形态了')
+
+
         # 立即触发特定buff
         if EFFECT_BUFF_BY_BT in skill_effect:
             for buffType in skill_effect[EFFECT_BUFF_BY_BT]:
@@ -980,6 +988,13 @@ class PCRScrimmage:
             if goal_player.now_stage == NOW_STAGE_OUT:
                 use_skill_player.attrChange(Attr.NOW_TP, HIT_DOWN_TP)  # 击倒回复tp
                 back_msg.append(f'{message_builder.at(goal_player.user_id)}出局')
+
+        # tp达到指定值时锁定回合
+        if EFFECT_TP_LOCKTURN in skill_effect:
+            num1 = skill_effect[EFFECT_TP_LOCKTURN]
+            if use_skill_player.attr[Attr.NOW_TP] >= num1:
+                self.lock_turn = 1
+                back_msg.append(f'{use_player_name}锁定了1回合')
 
         # 效果击倒tp
         if EFFECT_OUT_TP in skill_effect:
@@ -1065,7 +1080,7 @@ class PCRScrimmage:
         stage = player.now_stage
         msg = [f'回合剩余{WAIT_TIME * (STAGE_WAIT_TIME - self.player_satge_timer)}秒']
         if stage == NOW_STAGE_DICE:
-            msg.append(f'{message_builder.at(player.user_id)}的丢色子阶段(发送 丢色子)')
+            msg.append(f'{message_builder.at(player.user_id)}的丢色子阶段(发送 丢 或 丢色子)')
             await bot.send(ev, Message("\n".join(msg)))
         elif stage == NOW_STAGE_SKILL:
             msg.append(f'{message_builder.at(player.user_id)}的放技能阶段：\n(发送技能编号，如需选择目标则@目标)')
@@ -1583,9 +1598,9 @@ async def game_end(bot, ev: GroupMessageEvent, matcher: Matcher):
 
 @rule.handle()
 async def game_help_all_role(bot, ev: GroupMessageEvent):
-    msg = '''PCR大乱斗规则
+    msg = '''大乱斗规则
 1、和大富翁类似，一个正方形环形跑道，跑道上有多个事件，通过丢色子走到特定的位置触发事件
-2、可多个玩家同时玩，最多4个，最少2个。每个玩家可选择一个pcr里的角色，不同的角色有不同的属性、技能
+2、可多个玩家同时玩，最多4个，最少2个。每个玩家可选择一个角色列表里的角色，不同的角色有不同的属性、技能
 3、角色有tp值，可用来释放技能。每次投掷色子，所有玩家都会增加tp值，受到伤害也会增加tp值
 4、需要选择目标的技能释放范围可能有距离限制，以角色属性的攻击距离为准
 5、避免游戏时长过长，每(场上玩家数量)个玩家回合增加一次攻击力和攻击距离

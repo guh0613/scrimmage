@@ -26,15 +26,15 @@ import re
 from nonebot.params import CommandArg
 
 from configs.path_config import IMAGE_PATH
-from pathlib import Path
-from nonebot.adapters.onebot.v11 import MessageSegment, Message
+from nonebot.adapters.onebot.v11 import Message
 
 from utils import message_builder
 from utils.image_utils import pic2b64
 from PIL import Image, ImageFont, ImageDraw
-from nonebot import on_regex, on_fullmatch, on_message, logger, on_command
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, GROUP_ADMIN
+from nonebot import on_fullmatch, on_message, logger, on_command
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, GROUP_ADMIN
 from nonebot.matcher import Matcher
+from models.bag_user import BagUser
 
 from . import chara
 from .attr import Attr, AttrTextChange
@@ -124,7 +124,12 @@ async def get_user_card_dict(bot, group_id):
 def uid2card(uid, user_card_dict):
     return str(uid) if uid not in user_card_dict.keys() else user_card_dict[uid]
 
-
+##结算时可以获得的金币
+GOLD_DICT = {
+    2:[200, 100],
+    3:[600, 400, 200],
+    4:[1200, 900, 600, 300]
+}
 # 防御力计算机制。
 # 100点防御力内，每1点防御力增加0.15%伤害减免；
 # 到达100点防御力后，每一点防御力只可获得0.12%伤害减免；
@@ -1349,7 +1354,11 @@ async def game_create(bot, ev: GroupMessageEvent):
             msg = ['大乱斗已结束，排名如下：']
             for i in range(len(scrimmage.rank)):
                 user_card = uid2card(scrimmage.rank[i + 1], scrimmage.user_card_dict)
-                msg.append(f'第{i + 1}名：{user_card}')
+                puid = scrimmage.rank[i+1]
+                gold = GOLD_DICT[len(scrimmage.rank)][i]
+                await BagUser.add_gold(puid,gid,gold)
+                gold_msg = f',获得{gold}金币'
+                msg.append(f'第{i + 1}名：{user_card}{gold_msg}')
             await bot.send(ev, '\n'.join(msg))
         else:
             await bot.send(ev, f'游戏结束')

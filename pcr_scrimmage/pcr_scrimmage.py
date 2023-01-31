@@ -422,7 +422,7 @@ class Role:
 # 公主连结大乱斗
 class PCRScrimmage:
     # 初始化
-    def __init__(self, gid, manager, room_master, across_range=10, vertical_range=10, grid_size=50) -> None:
+    def __init__(self, gid, manager, room_master, is_debug, across_range=10, vertical_range=10, grid_size=50) -> None:
         ##核心数据
         self.gid = gid  # 群号
         self.mgr = manager  # 管理器
@@ -435,6 +435,7 @@ class PCRScrimmage:
         self.now_playing_players = []  # 当前正在游玩的玩家id	[xxx, xxx]
         self.rank = {}  # 结算排行	{1:xxx,2:xxx}
         self.player_satge_timer = 0  # 玩家阶段计时器。回合切换时重置
+        self.is_debug = is_debug
 
         self.user_card_dict = {}  # 群内所有成员信息
 
@@ -1292,15 +1293,17 @@ class PCRScrimmage:
 class manager:
     def __init__(self):
         self.playing: List[PCRScrimmage] = {}
-
     def is_playing(self, gid):
         return gid in self.playing
 
-    def start(self, gid, uid):
-        return PCRScrimmage(gid, self, uid)
+    def start(self, gid, uid, is_debug):
+        return PCRScrimmage(gid, self, uid, is_debug)
 
     def get_game(self, gid):
         return self.playing[gid] if gid in self.playing else None
+
+    def is_debug_game(self, gid):
+        return self.playing[gid].is_debug
 
 
 mgr = manager()
@@ -1317,12 +1320,12 @@ async def game_create(bot, ev: GroupMessageEvent):
     gid, uid = ev.group_id, ev.user_id
 
     if mgr.is_playing(gid):
-        await create.finish('游戏仍在进行中…')
+        await create.finish('有另一局游戏仍在进行中…')
     image = IMAGE_PATH / f'{gid}.png'
     if os.path.exists(image):
         os.remove(image)
 
-    with mgr.start(gid, uid) as scrimmage:
+    with mgr.start(gid, uid, is_debug=False) as scrimmage:
         msg = ['大乱斗房间已创建，等待加入中。。。',
                f'{WAIT_TIME}分钟后不开始会自动结束',
                f'当前人数({scrimmage.getPlayerNum()}/{MAX_PLAYER})',
@@ -1367,7 +1370,11 @@ async def game_create(bot, ev: GroupMessageEvent):
 @join.handle()
 async def game_join(bot, ev: GroupMessageEvent):
     gid, uid = ev.group_id, ev.user_id
+
+
     scrimmage = mgr.get_game(gid)
+    if scrimmage.is_debug:
+        await join.finish("当前游戏为测试服，请使用'加入内测大乱斗'来加入")
     if not scrimmage or scrimmage.now_statu != NOW_STATU_WAIT:
         return
     if uid in scrimmage.player_list:
@@ -1390,7 +1397,10 @@ async def game_join(bot, ev: GroupMessageEvent):
 @start.handle()
 async def game_start(bot, ev: GroupMessageEvent):
     gid, uid = ev.group_id, ev.user_id
+
     scrimmage = mgr.get_game(gid)
+    if scrimmage.is_debug:
+        await start.finish("当前游戏为测试服，请使用'开始内测大乱斗'来加入")
     if not scrimmage or scrimmage.now_statu != NOW_STATU_WAIT:
         return
     if not uid == scrimmage.room_master:

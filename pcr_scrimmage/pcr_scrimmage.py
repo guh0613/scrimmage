@@ -1324,7 +1324,9 @@ async def game_create(bot, ev: GroupMessageEvent):
     image = IMAGE_PATH / f'{gid}.png'
     if os.path.exists(image):
         os.remove(image)
-
+    from extensive_plugin import pcr_scrimmage_debug
+    if pcr_scrimmage_debug.mgr.is_playing(gid):
+        await create.finish('有测试服游戏正在进行中...')
     with mgr.start(gid, uid, is_debug=False) as scrimmage:
         msg = ['大乱斗房间已创建，等待加入中。。。',
                f'{WAIT_TIME}分钟后不开始会自动结束',
@@ -1373,14 +1375,12 @@ async def game_join(bot, ev: GroupMessageEvent):
 
 
     scrimmage = mgr.get_game(gid)
-    if scrimmage.is_debug:
-        await join.finish("当前游戏为测试服，请使用'加入内测大乱斗'来加入")
     if not scrimmage or scrimmage.now_statu != NOW_STATU_WAIT:
         return
     if uid in scrimmage.player_list:
-        await bot.finish(ev, '您已经在准备房间里了', at_sender=True)
+        await join.finish('您已经在准备房间里了', at_sender=True)
     if scrimmage.getPlayerNum() >= MAX_PLAYER:
-        await bot.finish(ev, '人数已满，无法继续加入', at_sender=True)
+        await join.finish('人数已满，无法继续加入', at_sender=True)
 
     scrimmage.ready(uid)
 
@@ -1399,14 +1399,12 @@ async def game_start(bot, ev: GroupMessageEvent):
     gid, uid = ev.group_id, ev.user_id
 
     scrimmage = mgr.get_game(gid)
-    if scrimmage.is_debug:
-        await start.finish("当前游戏为测试服，请使用'开始内测大乱斗'来加入")
     if not scrimmage or scrimmage.now_statu != NOW_STATU_WAIT:
         return
     if not uid == scrimmage.room_master:
-        await bot.finish(ev, '只有房主才能开始', at_sender=True)
+        await start.finish('只有房主才能开始', at_sender=True)
     if scrimmage.getPlayerNum() < 2:
-        await bot.finish(ev, '要两个人以上才能开始', at_sender=True)
+        await start.finish('要两个人以上才能开始', at_sender=True)
 
     scrimmage.now_statu = NOW_STATU_SELECT_ROLE
     role_list = '游戏开始，请选择角色，当前可选角色：\n（'
@@ -1438,7 +1436,7 @@ async def select_role(bot, ev: GroupMessageEvent):
         img = player.role_icon
         img.save(image)
         imgcode = message_builder.image(b64=pic2b64(Image.open(image)))
-        await bot.send(ev, f"你选择的角色是：{player.name}", at_sender=True)
+        await selectcha.send(f"你选择的角色是：{player.name}", at_sender=True)
 
         if scrimmage.checkAllPlayerSelectRole():
             await asyncio.sleep(PROCESS_WAIT_TIME)
@@ -1609,7 +1607,7 @@ async def game_end(bot, ev: GroupMessageEvent, matcher: Matcher):
     if not scrimmage or scrimmage.now_statu == NOW_STATU_END:
         return
     if not matcher.permission == GROUP_ADMIN and not uid == scrimmage.room_master:
-        await bot.finish(ev, '只有群管理或房主才能强制结束', at_sender=True)
+        await finish.finish('只有群管理或房主才能强制结束', at_sender=True)
 
     scrimmage.now_statu = NOW_STATU_END
     await bot.send(ev, f"您已强制结束大乱斗，请等待结算")

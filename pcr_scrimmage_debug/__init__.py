@@ -410,6 +410,7 @@ class PCRScrimmage:
         self.rank = {}  # 结算排行	{1:xxx,2:xxx}
         self.player_satge_timer = 0  # 玩家阶段计时器。回合切换时重置
         self.is_debug = is_debug # 是否是测试服(已弃用)
+        self.is_selected = [] # 是否已经被选
 
         self.user_card_dict = {}  # 群内所有成员信息
 
@@ -1421,6 +1422,10 @@ async def select_role(bot, ev: GroupMessageEvent):
 
     characterid = chara.name2id(ev.message.extract_plain_text())
     if characterid != chara.UNKNOWN and characterid in ROLE:
+        if characterid in scrimmage.is_selected:
+            await selectcha.finish('这个角色已经被其他玩家选择了', at_sender=True)
+
+        scrimmage.is_selected.append(characterid)
         player = scrimmage.getPlayerObj(uid)
         player.initData(characterid, scrimmage)
 

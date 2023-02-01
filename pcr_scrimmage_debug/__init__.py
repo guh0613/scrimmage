@@ -32,7 +32,7 @@ from utils import message_builder
 from utils.image_utils import pic2b64
 from PIL import Image, ImageFont, ImageDraw
 from nonebot import on_fullmatch, on_message, logger, on_command
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, GROUP_ADMIN
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, GROUP_ADMIN, GROUP_OWNER
 from nonebot.matcher import Matcher
 from models.bag_user import BagUser
 
@@ -1597,13 +1597,13 @@ async def check_role(bot, ev: GroupMessageEvent, arg: Message = CommandArg()):
 
 
 @finish.handle()
-async def game_end(bot, ev: GroupMessageEvent, matcher: Matcher):
+async def game_end(bot, ev: GroupMessageEvent):
     gid, uid = ev.group_id, ev.user_id
 
     scrimmage = mgr.get_game(gid)
     if not scrimmage or scrimmage.now_statu == NOW_STATU_END:
         return
-    if not matcher.permission == GROUP_ADMIN and not uid == scrimmage.room_master:
+    if not await GROUP_ADMIN(bot, ev) and not await GROUP_OWNER(bot, ev) and not uid == scrimmage.room_master:
         await finish.finish('只有群管理或房主才能强制结束', at_sender=True)
 
     scrimmage.now_statu = NOW_STATU_END

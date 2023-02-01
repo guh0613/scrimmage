@@ -46,7 +46,7 @@ from .role import (EFFECT_BUFF, EFFECT_BUFF_BY_BT, EFFECT_DIZZINESS, EFFECT_HIT_
                    EFFECT_HURT, EFFECT_ATTR_CHANGE, EFFECT_MOVE, EFFECT_MOVE_GOAL, EFFECT_LIFESTEAL,
                    EFFECT_OUT_TP, EFFECT_OUT_LOCKTURN, EFFECT_IGNORE_DIST, EFFECT_AOE, EFFECT_ELIMINATE,
                    TRIGGER_ME, TRIGGER_ALL_EXCEPT_ME, TRIGGER_ALL, TRIGGER_SELECT, TRIGGER_SELECT_EXCEPT_ME,
-                   TRIGGER_NEAR, EFFECT_DEL_BUFF, EFFECT_TP_LOCKTURN)
+                   TRIGGER_NEAR, EFFECT_DEL_BUFF, EFFECT_TP_LOCKTURN,POSITION_DEFEND,POSITION_SPECIAL,POSITION_BURST,POSITION_ATTACK)
 __zx_plugin_name__ = "大乱斗(测试服)"
 __plugin_usage__ = """
 usage：
@@ -409,7 +409,7 @@ class PCRScrimmage:
         self.now_playing_players = []  # 当前正在游玩的玩家id	[xxx, xxx]
         self.rank = {}  # 结算排行	{1:xxx,2:xxx}
         self.player_satge_timer = 0  # 玩家阶段计时器。回合切换时重置
-        self.is_debug = is_debug
+        self.is_debug = is_debug # 是否是测试服(已弃用)
 
         self.user_card_dict = {}  # 群内所有成员信息
 
@@ -1361,7 +1361,7 @@ async def game_join(bot, ev: GroupMessageEvent):
     await bot.send(ev, f'已加入\n当前人数({scrimmage.getPlayerNum()}/{MAX_PLAYER})\n{" ".join(msg)}')
     if scrimmage.getPlayerNum() == MAX_PLAYER:
         await bot.send(ev,
-                       f'人数已满，可开始游戏。\n' + message_builder.at(scrimmage.room_master) + '（发送“开始大乱斗”开始）')
+                       f'人数已满，可开始游戏。\n' + message_builder.at(scrimmage.room_master) + '（发送“开始内测大乱斗”开始）')
 
 
 @start.handle()
@@ -1377,10 +1377,31 @@ async def game_start(bot, ev: GroupMessageEvent):
         await start.finish('要两个人以上才能开始', at_sender=True)
 
     scrimmage.now_statu = NOW_STATU_SELECT_ROLE
-    role_list = '游戏开始，请选择角色，当前可选角色：\n（'
+    role_list = '游戏开始，请选择角色，当前可选角色：\n'
+    msgd = ''
+    msga = ''
+    msgb = ''
+    msgs = ''
     for role in ROLE.values():
-        role_list += f'{role["name"]} '
-    role_list += ')\n输入“角色详情 角色名” 可查看角色属性和技能\n（所有人都选择角色后自动开始）\n'
+        if role["position"] == POSITION_DEFEND:
+            msgd += f'{role["name"]} '
+        if role["position"] == POSITION_ATTACK:
+            msga += f'{role["name"]} '
+        if role["position"] == POSITION_BURST:
+            msgb += f'{role["name"]} '
+        if role["position"] == POSITION_SPECIAL:
+            msgs += f'{role["name"]} '
+    role_list += '————————————————————\n'
+    role_list += '防御：\n'
+    role_list += msgd
+    role_list += '\n——————————————————\n输出：\n'
+    role_list += msga
+    role_list += '\n——————————————————\n爆发：\n'
+    role_list += msgb
+    role_list += '\n——————————————————\n特殊：\n'
+    role_list += msgs
+    role_list += '\n——————————————————'
+    role_list += '\n输入“角色详情 角色名” 可查看角色属性和技能\n（所有人都选择角色后自动开始）\n'
     for player_id in scrimmage.player_list:
         role_list += message_builder.at(player_id)
     await bot.send(ev, role_list)
@@ -1552,6 +1573,7 @@ async def check_role(bot, ev: GroupMessageEvent, arg: Message = CommandArg()):
         role_info = ROLE[characterid]
         msg = [
             f"名字：{role_info['name']}",
+            f"角色定位：{role_info['position']}",
             f"生命值：{role_info['health']}",
             f"TP：{role_info['tp']}",
             f"攻击距离：{role_info['distance']}",
@@ -1602,12 +1624,33 @@ async def game_help_all_role(bot, ev: GroupMessageEvent):
 
 @version.handle()
 async def _(bot, ev: GroupMessageEvent):
-    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.4.1\n更新时间：2023-1-31\n—————————\n正式服:\n当前版本：1.4.1\n更新时间：2023-1-31")
+    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.5\n更新时间：2023-2-1\n—————————\n正式服:\n当前版本：1.4.1\n更新时间：2023-1-31")
 
 @character.handle()
 async def game_help_rule(bot, ev: GroupMessageEvent):
-    msg = '当前可选角色有：\n'
+    msgd = ''
+    msga = ''
+    msgb = ''
+    msgs = ''
     for role in ROLE.values():
-        msg += f'{role["name"]} '
+        if role["position"] == POSITION_DEFEND:
+            msgd += f'{role["name"]} '
+        if role["position"] == POSITION_ATTACK:
+            msga += f'{role["name"]} '
+        if role["position"] == POSITION_BURST:
+            msgb += f'{role["name"]} '
+        if role["position"] == POSITION_SPECIAL:
+            msgs += f'{role["name"]} '
+    msg = '当前可选角色有：\n'
+    msg += '————————————————————\n'
+    msg += '防御：\n'
+    msg += msgd
+    msg += '\n——————————————————\n输出：\n'
+    msg += msga
+    msg += '\n——————————————————\n爆发：\n'
+    msg += msgb
+    msg += '\n——————————————————\n特殊：\n'
+    msg += msgs
+    msg += '\n——————————————————'
     msg += f'\n共{len(ROLE)}位角色'
     await bot.send(ev, msg)

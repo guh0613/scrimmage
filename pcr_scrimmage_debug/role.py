@@ -92,6 +92,13 @@ TRIGGER_ALL_EXCEPT_ME = "all_except_me"  # 对所有人有效(除了自己)
 TRIGGER_ME = "me"  # 只对自己有效
 TRIGGER_NEAR = "near"  # 离自己最近的目标
 
+# 角色定位
+POSITION_DEFEND = "防御型" # 防御，以高防御高血量进行持续战斗的定位
+POSITION_ATTACK = "输出型" # 输出，持续输出兼顾发育的定位
+POSITION_BURST = "爆发型" # 爆发，以高爆发输出秒人的定位
+POSITION_SPECIAL = "特殊型" # 特殊，拥有独特技能效果的定位
+
+
 from .attr import Attr
 from .buff import BuffType
 
@@ -101,6 +108,7 @@ ROLE = {
 
     1701: {
         "name": "环奈",
+        "position": POSITION_ATTACK,
 
         "health": 1000,
         "distance": 9,
@@ -185,6 +193,7 @@ ROLE = {
     },
     1068: {
         "name": "晶",
+        "position": POSITION_ATTACK,
 
         "health": 1300,
         "distance": 9,
@@ -300,6 +309,7 @@ ROLE = {
     },
     1061: {
         "name": "矛依未",
+        "position": POSITION_BURST,
 
         "health": 1200,
         "distance": 5,
@@ -398,6 +408,7 @@ ROLE = {
     },
     1060: {
         "name": "凯露",
+        "position": POSITION_ATTACK,
 
         "health": 1050,
         "distance": 10,
@@ -471,6 +482,7 @@ ROLE = {
 
     1059: {
         "name": "可可萝",
+        "position": POSITION_DEFEND,
 
         "health": 1000,
         "distance": 6,
@@ -535,6 +547,7 @@ ROLE = {
     },
     1058: {
         "name": "佩可",
+        "position": POSITION_DEFEND,
 
         "health": 1800,
         "distance": 5,
@@ -608,6 +621,8 @@ ROLE = {
     },
     1057: {
         "name": "姬塔",
+        "position": POSITION_BURST,
+
         "health": 900,
         "distance": 5,
         "attack": 90,
@@ -684,6 +699,8 @@ ROLE = {
     },
     1052: {
         "name": "莉玛",
+        "position": POSITION_DEFEND,
+
         "health": 1700,
         "distance": 5,
         "attack": 0,
@@ -767,6 +784,8 @@ ROLE = {
     },
     1049: {
         "name": "静流",
+        "position": POSITION_DEFEND,
+
         "health": 1200,
         "distance": 5,
         "attack": 70,
@@ -839,6 +858,8 @@ ROLE = {
     },
     1044: {
         "name": "伊莉亚",
+        "position": POSITION_ATTACK,
+
         "health": 1280,
         "distance": 6,
         "attack": 180,
@@ -921,6 +942,8 @@ ROLE = {
     },
     1040: {
         "name": "碧",
+        "position": POSITION_SPECIAL,
+
         "health": 1000,
         "distance": 15,
         "attack": 100,
@@ -989,6 +1012,8 @@ ROLE = {
     },
     1038: {
         "name": "栞",
+        "position": POSITION_ATTACK,
+
         "health": 875,
         "distance": 12,
         "attack": 80,
@@ -1066,6 +1091,8 @@ ROLE = {
     },
     1036: {
         "name": "镜华",
+        "position": POSITION_BURST,
+
         "health": 800,
         "distance": 15,
         "attack": 150,
@@ -1132,6 +1159,8 @@ ROLE = {
     },
     1034: {
         "name": "优花梨",
+        "position": POSITION_DEFEND,
+
         "health": 1200,
         "distance": 7,
         "attack": 0,
@@ -1209,6 +1238,8 @@ ROLE = {
     },
     1029: {
         "name": "望",
+        "position": POSITION_DEFEND,
+
         "health": 1200,
         "distance": 7,
         "attack": 100,
@@ -1286,6 +1317,8 @@ ROLE = {
     },
     1028: {
         "name": "咲恋",
+        "position": POSITION_ATTACK,
+
         "health": 1100,
         "distance": 7,
         "attack": 90,
@@ -1351,6 +1384,8 @@ ROLE = {
     },
     1022: {
         "name": "依里",
+        "position": POSITION_BURST,
+
         "health": 900,
         "distance": 10,
         "attack": 120,
@@ -1415,6 +1450,8 @@ ROLE = {
     },
     1020: {
         "name": "美美",
+        "position": POSITION_ATTACK,
+
         "health": 1000,
         "distance": 5,
         "attack": 110,
@@ -1485,6 +1522,8 @@ ROLE = {
     },
     1017: {
         "name": "香织",
+        "position": POSITION_BURST,
+
         "health": 900,
         "distance": 5,
         "attack": 120,
@@ -1551,6 +1590,8 @@ ROLE = {
     },
     1016: {
         "name": "铃奈",
+        "position": POSITION_BURST,
+
         "health": 900,
         "distance": 12,
         "attack": 100,
@@ -1609,6 +1650,8 @@ ROLE = {
     },
     1008: {
         "name": "雪",
+        "position": POSITION_BURST,
+
         "health": 800,
         "distance": 10,
         "attack": 110,
@@ -1688,6 +1731,8 @@ ROLE = {
     },
     1007: {
         "name": "宫子",
+        "position": POSITION_DEFEND,
+
         "health": 1200,
         "distance": 5,
         "attack": 80,
@@ -1754,6 +1799,8 @@ ROLE = {
     },
     1006: {
         "name": "茜里",
+        "position": POSITION_ATTACK,
+
         "health": 1000,
         "distance": 10,
         "attack": 90,
@@ -1814,6 +1861,8 @@ ROLE = {
     },
     1005: {
         "name": "茉莉",
+        "position": POSITION_ATTACK,
+
         "health": 1100,
         "distance": 5,
         "attack": 90,
@@ -1895,6 +1944,8 @@ ROLE = {
     },
     1004: {
         "name": "未奏希",
+        "position": POSITION_ATTACK,
+
         "health": 1200,
         "distance": 10,
         "attack": 100,
@@ -1961,6 +2012,8 @@ ROLE = {
     },
     1003: {
         "name": "怜",
+        "position": POSITION_ATTACK,
+
         "health": 900,
         "distance": 5,
         "attack": 100,
@@ -2031,6 +2084,8 @@ ROLE = {
     },
     1002: {
         "name": "优衣",
+        "position": POSITION_SPECIAL,
+
         "health": 1000,
         "distance": 8,
         "attack": 80,
@@ -2092,6 +2147,8 @@ ROLE = {
     },
     1001: {
         "name": "日和莉",
+        "position": POSITION_BURST,
+
         "health": 1000,
         "distance": 5,
         "attack": 100,
@@ -2151,6 +2208,8 @@ ROLE = {
     },
     5101: {
         "name": "phelia",
+        "position": POSITION_BURST,
+
         "health": 1200,
         "distance": 8,
         "attack": 100,
@@ -2248,6 +2307,8 @@ ROLE = {
     },
     5102: {
         "name": "昊京",
+        "position": POSITION_SPECIAL,
+
         "health": 1200,
         "distance": 5,
         "attack": 50,

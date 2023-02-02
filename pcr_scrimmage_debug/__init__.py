@@ -37,6 +37,7 @@ from nonebot.matcher import Matcher
 from models.bag_user import BagUser
 
 from . import chara
+from .utils.utils import init_data, load_skill_data, create_skill_data, get_skill_level, save_skill_data, update_skill_data
 from .attr import Attr, AttrTextChange
 from .buff import BuffEffectType, BuffTriggerType, Buff, BuffType
 from .runway_case import (CASE_NONE, CASE_ATTACK, CASE_DEFENSIVE, CASE_HEALTH,
@@ -77,6 +78,7 @@ start = on_fullmatch("开始内测大乱斗", priority=5, block=True)
 join = on_fullmatch("加入内测大乱斗", priority=5, block=True)
 create = on_fullmatch("创建内测大乱斗", priority=5, block=True)
 version = on_command("大乱斗版本", priority=5, block=True)
+skillrate = on_command("查看熟练度", priority=5, block=True)
 
 FILE_PATH = os.path.dirname(__file__)
 
@@ -86,6 +88,9 @@ if not os.path.exists(IMAGE_PATH):
     os.mkdir(IMAGE_PATH)
     logger.info('create folder succeed')
 
+
+init_data()
+SKILL_DICT_ALL = load_skill_data()
 
 async def get_user_card_dict(bot, group_id):
     mlist = await bot.get_group_member_list(group_id=group_id)
@@ -104,6 +109,13 @@ GOLD_DICT = {
     3:[600, 400, 200],
     4:[1200, 900, 600, 300]
 }
+
+SKILL_RATE_DICT = {
+    2:[1, 0],
+    3:[2.5, 1, 0],
+    4:[3.5, 2, 1.5, 1]
+}
+
 # 防御力计算机制。
 # 100点防御力内，每1点防御力增加0.15%伤害减免；
 # 到达100点防御力后，每一点防御力只可获得0.12%伤害减免；
@@ -177,6 +189,7 @@ class Role:
         self.role_icon = None  # 角色头像
         self.player_num = 0  # 玩家在这个房间的编号
         self.room_obj = None  # 房间对象
+        self.position = '' # 角色定位
 
         self.attr = {}  # 角色属性列表
         '''
@@ -213,6 +226,7 @@ class Role:
             self.name = role_data['name']
             self.role_icon = Image.open(image)
             self.room_obj: PCRScrimmage = room_obj
+            self.position = role_data['position']
 
             self.attr[Attr.MAX_HEALTH] = role_data['health']
             self.attr[Attr.NOW_HEALTH] = self.attr[Attr.MAX_HEALTH]
@@ -1332,10 +1346,19 @@ async def game_create(bot, ev: GroupMessageEvent):
             for i in range(len(scrimmage.rank)):
                 user_card = uid2card(scrimmage.rank[i + 1], scrimmage.user_card_dict)
                 puid = scrimmage.rank[i+1]
+                player = scrimmage.getPlayerObj(puid)
+                skill_rate = SKILL_RATE_DICT[len(scrimmage.rank)][i]
+                global SKILL_DICT_ALL
+                SKILL_DICT_ALL = update_skill_data(puid, player.position, SKILL_DICT_ALL, skill_rate)
+                save_skill_data(SKILL_DICT_ALL)
+                if skill_rate > 0:
+                    skill_msg = f',且对 {player.position} 角色的熟练度提高了！'
+                else:
+                    skill_msg = ''
                 gold = GOLD_DICT[len(scrimmage.rank)][i]
                 await BagUser.add_gold(puid,gid,gold)
                 gold_msg = f',获得{gold}金币'
-                msg.append(f'第{i + 1}名：{user_card}{gold_msg}')
+                msg.append(f'第{i + 1}名：{user_card}{gold_msg}{skill_msg}')
             await bot.send(ev, '\n'.join(msg))
         else:
             await bot.send(ev, f'游戏结束')
@@ -1378,6 +1401,7 @@ async def game_start(bot, ev: GroupMessageEvent):
         await start.finish('要两个人以上才能开始', at_sender=True)
 
     scrimmage.now_statu = NOW_STATU_SELECT_ROLE
+
     role_list = '游戏开始，请选择角色，当前可选角色：\n'
     msgd = ''
     msga = ''
@@ -1402,7 +1426,7 @@ async def game_start(bot, ev: GroupMessageEvent):
     role_list += '\n——————————————————\n特殊：\n'
     role_list += msgs
     role_list += '\n——————————————————'
-    role_list += '\n输入“角色详情 角色名” 可查看角色属性和技能\n（所有人都选择角色后自动开始）\n'
+    role_list += '\n输入“角色详情 角色名” 可查看角色属性和技能\n输入"查看熟练度"可查看你的熟练度\n（所有人都选择角色后自动开始）\n'
     for player_id in scrimmage.player_list:
         role_list += message_builder.at(player_id)
     await bot.send(ev, role_list)
@@ -1629,7 +1653,23 @@ async def game_help_all_role(bot, ev: GroupMessageEvent):
 
 @version.handle()
 async def _(bot, ev: GroupMessageEvent):
-    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.5\n更新时间：2023-2-1\n—————————\n正式服:\n当前版本：1.4.1\n更新时间：2023-1-31")
+    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.5.1\n更新时间：2023-2-2\n—————————\n正式服:\n当前版本：1.4.1\n更新时间：2023-1-31")
+
+@skillrate.handle()
+async def _(bot, ev: GroupMessageEvent):
+    uid = ev.user_id
+    name = ev.sender.card or ev.sender.nickname
+    global SKILL_DICT_ALL
+    if not str(uid) in SKILL_DICT_ALL.keys():
+        SKILL_DICT_ALL = create_skill_data(uid, SKILL_DICT_ALL)
+        save_skill_data(SKILL_DICT_ALL)
+    judge = get_skill_level(uid, "all", SKILL_DICT_ALL)
+    msg = f"玩家 {name} 的熟练度信息\n"
+    msg += f"防御: {judge[0]}\n"
+    msg += f"输出: {judge[1]}\n"
+    msg += f"爆发: {judge[2]}\n"
+    msg += f"特殊: {judge[3]}"
+    await skillrate.send(msg)
 
 @character.handle()
 async def game_help_rule(bot, ev: GroupMessageEvent):

@@ -37,7 +37,8 @@ from nonebot.matcher import Matcher
 from models.bag_user import BagUser
 
 from . import chara
-from .utils.utils import init_data, load_skill_data, create_skill_data, get_skill_level, save_skill_data, update_skill_data
+from .utils.utils import (init_data, load_skill_data, create_skill_data, get_skill_level, save_skill_data, update_skill_data, get_skill_bonus
+                            , SKILL_RATE_LEGEND, SKILL_RATE_MASTER, SKILL_RATE_ADVANCED, SKILL_RATE_SKILFUL, SKILL_RATE_ONHAND, SKILL_RATE_NEW)
 from .attr import Attr, AttrTextChange
 from .buff import BuffEffectType, BuffTriggerType, Buff, BuffType
 from .runway_case import (CASE_NONE, CASE_ATTACK, CASE_DEFENSIVE, CASE_HEALTH,
@@ -79,6 +80,7 @@ join = on_fullmatch("加入内测大乱斗", priority=5, block=True)
 create = on_fullmatch("创建内测大乱斗", priority=5, block=True)
 version = on_command("大乱斗版本", priority=5, block=True)
 skillrate = on_command("查看熟练度", priority=5, block=True)
+skillbonus = on_fullmatch("熟练度奖励", priority=5, block=True)
 
 FILE_PATH = os.path.dirname(__file__)
 
@@ -242,6 +244,19 @@ class Role:
 
             self.active_skills = role_data['active_skills']
             self.passive_skills = role_data['passive_skills']
+        bonus_dict = get_skill_bonus(self.user_id, self.position, SKILL_DICT_ALL)
+        for k,v in bonus_dict.items():
+            if k == "defend":
+                self.attr[Attr.DEFENSIVE] += v
+            if k == "health":
+                self.attr[Attr.MAX_HEALTH] += v
+                self.attr[Attr.NOW_HEALTH] += v
+            if k == "attack":
+                self.attr[Attr.ATTACK] += v
+            if k == "distance":
+                self.attr[Attr.DISTANCE] += v
+            if k == "tp":
+                self.attr[Attr.NOW_TP] += v
 
     # 属性数值改变的统一处理
     def attrChange(self, attr_type, num):
@@ -1452,6 +1467,9 @@ async def select_role(bot, ev: GroupMessageEvent):
         scrimmage.is_selected.append(characterid)
         player = scrimmage.getPlayerObj(uid)
         player.initData(characterid, scrimmage)
+        skilllevel = get_skill_level(uid, player.position, SKILL_DICT_ALL)
+        if not skilllevel == SKILL_RATE_NEW:
+            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},发送"熟练度奖励"来查询你获得的熟练度奖励')
 
         img = player.role_icon
         img.save(image)
@@ -1463,6 +1481,35 @@ async def select_role(bot, ev: GroupMessageEvent):
             await bot.send(ev, "所有人都选择了角色，大乱斗即将开始！\n碾碎他们")
             await asyncio.sleep(PROCESS_WAIT_TIME)
             scrimmage.now_statu = NOW_STATU_OPEN
+
+@skillbonus.handle()
+async def bonus(bot, ev: GroupMessageEvent):
+    gid, uid = ev.group_id, ev.user_id
+    scrimmage = mgr.get_game(gid)
+
+    if not scrimmage or not scrimmage.now_statu in (NOW_STATU_OPEN,NOW_STATU_SELECT_ROLE):
+        return
+    if uid not in scrimmage.player_list:
+        await skillbonus.finish('你还没有选择任何角色', at_sender=True)
+
+    player = scrimmage.getPlayerObj(uid)
+    skilllevel = get_skill_level(uid, player.position, SKILL_DICT_ALL)
+    if skilllevel == SKILL_RATE_NEW:
+        await skillbonus.finish('你当前没有获得任何熟练度奖励。继续努力吧！')
+    bonus_dict = get_skill_bonus(uid, player.position, SKILL_DICT_ALL)
+    msg = '你的熟练度奖励如下：\n'
+    for k, v in bonus_dict.items():
+        if k == "defend":
+            msg += f'防御力：+{v}\n'
+        if k == "health":
+            msg += f'生命值：+{v}\n'
+        if k == "attack":
+            msg += f'攻击力：+{v}\n'
+        if k == "distance":
+            msg += f'攻击距离：+{v}\n'
+        if k == "tp":
+            msg += f'初始tp值：+{v}\n'
+    await skillbonus.finish(msg, at_sender=True)
 
 
 @dice.handle()
@@ -1653,7 +1700,7 @@ async def game_help_all_role(bot, ev: GroupMessageEvent):
 
 @version.handle()
 async def _(bot, ev: GroupMessageEvent):
-    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.5.1\n更新时间：2023-2-2\n—————————\n正式服:\n当前版本：1.4.1\n更新时间：2023-1-31")
+    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.6\n更新时间：2023-2-23\n—————————\n正式服:\n当前版本：1.4.1\n更新时间：2023-1-31")
 
 @skillrate.handle()
 async def _(bot, ev: GroupMessageEvent):

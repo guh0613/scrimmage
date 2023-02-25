@@ -77,8 +77,14 @@ def get_skill_level(uid, position: str, skill_dict_all: Dict):
         for values in skill_dict_all[uid].values():
             judge.append(judge_skill_level(values))
         return judge
-    else:
-        return judge_skill_level(skill_dict_all[uid][position])
+    if position == "防御型":
+        return judge_skill_level(skill_dict_all[uid]["defend"])
+    if position == "输出型":
+        return judge_skill_level(skill_dict_all[uid]["attack"])
+    if position == "爆发型":
+        return judge_skill_level(skill_dict_all[uid]["burst"])
+    if position == "特殊型":
+        return judge_skill_level(skill_dict_all[uid]["special"])
 
 def get_skill_bonus(uid, position: str, skill_dict_all: Dict):
     uid = str(uid)

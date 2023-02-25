@@ -123,7 +123,7 @@ SKILL_RATE_DICT = {
 # 到达100点防御力后，每一点防御力只可获得0.12%伤害减免；
 # 100点防御力后，每1点防御力增加0.05%伤害减免；
 # 最高有效防御力为1000
-# （防御力可无限提升，但最高只能获得55%伤害减免）
+# （防御力可无限提升，但最高只能获得57%伤害减免）
 def hurt_defensive_calculate(hurt, defensive):
     percent = 0.0
     if defensive <= 100:
@@ -132,7 +132,7 @@ def hurt_defensive_calculate(hurt, defensive):
         if defensive <= 1000:
             percent = 100 * 0.0012 + (defensive - 100) * 0.0005
         else:
-            percent = 100 * 0.001 + 900 * 0.0005
+            percent = 100 * 0.0012 + 900 * 0.0005
     return hurt - hurt * percent
 
 
@@ -1468,8 +1468,12 @@ async def select_role(bot, ev: GroupMessageEvent):
         player = scrimmage.getPlayerObj(uid)
         player.initData(characterid, scrimmage)
         skilllevel = get_skill_level(uid, player.position, SKILL_DICT_ALL)
-        if not skilllevel == SKILL_RATE_NEW:
-            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},发送"熟练度奖励"来查询你获得的熟练度奖励')
+        if skilllevel == SKILL_RATE_NEW:
+            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},没有获得任何熟练度奖励。继续努力吧！',
+                                 at_sender=True)
+        else:
+            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},发送"熟练度奖励"来查询你获得的熟练度奖励',
+                                 at_sender=True)
 
         img = player.role_icon
         img.save(image)
@@ -1497,18 +1501,18 @@ async def bonus(bot, ev: GroupMessageEvent):
     if skilllevel == SKILL_RATE_NEW:
         await skillbonus.finish('你当前没有获得任何熟练度奖励。继续努力吧！')
     bonus_dict = get_skill_bonus(uid, player.position, SKILL_DICT_ALL)
-    msg = '你的熟练度奖励如下：\n'
+    msg = '你的熟练度奖励如下：'
     for k, v in bonus_dict.items():
         if k == "defend":
-            msg += f'防御力：+{v}\n'
+            msg += f'\n防御力+{v}'
         if k == "health":
-            msg += f'生命值：+{v}\n'
+            msg += f'\n生命值+{v}'
         if k == "attack":
-            msg += f'攻击力：+{v}\n'
+            msg += f'\n攻击力+{v}'
         if k == "distance":
-            msg += f'攻击距离：+{v}\n'
+            msg += f'\n攻击距离+{v}'
         if k == "tp":
-            msg += f'初始tp值：+{v}\n'
+            msg += f'\n初始tp值+{v}'
     await skillbonus.finish(msg, at_sender=True)
 
 
@@ -1700,7 +1704,7 @@ async def game_help_all_role(bot, ev: GroupMessageEvent):
 
 @version.handle()
 async def _(bot, ev: GroupMessageEvent):
-    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.6\n更新时间：2023-2-23\n—————————\n正式服:\n当前版本：1.4.1\n更新时间：2023-1-31")
+    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.6.1\n更新时间：2023-2-25\n—————————\n正式服:\n当前版本：1.6.1\n更新时间：2023-2-25")
 
 @skillrate.handle()
 async def _(bot, ev: GroupMessageEvent):

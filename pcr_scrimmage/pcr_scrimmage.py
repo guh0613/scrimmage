@@ -32,11 +32,13 @@ from utils import message_builder
 from utils.image_utils import pic2b64
 from PIL import Image, ImageFont, ImageDraw
 from nonebot import on_fullmatch, on_message, logger, on_command
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, GROUP_ADMIN
+from nonebot.adapters.onebot.v11 import GroupMessageEvent, GROUP_ADMIN, GROUP_OWNER
 from nonebot.matcher import Matcher
 from models.bag_user import BagUser
 
 from . import chara
+from .utils.utils import (init_data, load_skill_data, create_skill_data, get_skill_level, save_skill_data, update_skill_data, get_skill_bonus
+                            , SKILL_RATE_LEGEND, SKILL_RATE_MASTER, SKILL_RATE_ADVANCED, SKILL_RATE_SKILFUL, SKILL_RATE_ONHAND, SKILL_RATE_NEW)
 from .attr import Attr, AttrTextChange
 from .buff import BuffEffectType, BuffTriggerType, Buff, BuffType
 from .runway_case import (CASE_NONE, CASE_ATTACK, CASE_DEFENSIVE, CASE_HEALTH,
@@ -46,8 +48,7 @@ from .role import (EFFECT_BUFF, EFFECT_BUFF_BY_BT, EFFECT_DIZZINESS, EFFECT_HIT_
                    EFFECT_HURT, EFFECT_ATTR_CHANGE, EFFECT_MOVE, EFFECT_MOVE_GOAL, EFFECT_LIFESTEAL,
                    EFFECT_OUT_TP, EFFECT_OUT_LOCKTURN, EFFECT_IGNORE_DIST, EFFECT_AOE, EFFECT_ELIMINATE,
                    TRIGGER_ME, TRIGGER_ALL_EXCEPT_ME, TRIGGER_ALL, TRIGGER_SELECT, TRIGGER_SELECT_EXCEPT_ME,
-                   TRIGGER_NEAR, EFFECT_DEL_BUFF, EFFECT_TP_LOCKTURN)
-
+                   TRIGGER_NEAR, EFFECT_DEL_BUFF, EFFECT_TP_LOCKTURN,POSITION_DEFEND,POSITION_SPECIAL,POSITION_BURST,POSITION_ATTACK)
 __zx_plugin_name__ = "大乱斗"
 __plugin_usage__ = """
 usage：
@@ -94,7 +95,7 @@ __plugin_settings__ = {
 info = on_command("角色详情", priority=5, block=True)
 prop = on_fullmatch("查看属性", priority=5, block=True)
 finish = on_fullmatch("结束大乱斗", priority=5, block=True)
-rule = on_fullmatch("大乱斗规则", priority=5, block=True)
+rule = on_fullmatch("大乱斗规则", priority=4, block=True)
 character = on_fullmatch("大乱斗角色", priority=5, block=True)
 surrend = on_fullmatch("认输", priority=5, block=True)
 skill = on_message(priority=999, block=True)
@@ -103,6 +104,7 @@ selectcha = on_message(priority=999, block=True)
 start = on_fullmatch("开始大乱斗", priority=5, block=True)
 join = on_fullmatch("加入大乱斗", priority=5, block=True)
 create = on_fullmatch("创建大乱斗", priority=5, block=True)
+skillbonus = on_fullmatch("熟练度奖励", priority=5, block=True)
 
 FILE_PATH = os.path.dirname(__file__)
 
@@ -112,6 +114,9 @@ if not os.path.exists(IMAGE_PATH):
     os.mkdir(IMAGE_PATH)
     logger.info('create folder succeed')
 
+
+init_data()
+SKILL_DICT_ALL = load_skill_data()
 
 async def get_user_card_dict(bot, group_id):
     mlist = await bot.get_group_member_list(group_id=group_id)
@@ -130,12 +135,19 @@ GOLD_DICT = {
     3:[600, 400, 200],
     4:[1200, 900, 600, 300]
 }
+
+SKILL_RATE_DICT = {
+    2:[1, 0],
+    3:[2.5, 1, 0],
+    4:[3.5, 2, 1.5, 1]
+}
+
 # 防御力计算机制。
 # 100点防御力内，每1点防御力增加0.15%伤害减免；
 # 到达100点防御力后，每一点防御力只可获得0.12%伤害减免；
 # 100点防御力后，每1点防御力增加0.05%伤害减免；
 # 最高有效防御力为1000
-# （防御力可无限提升，但最高只能获得55%伤害减免）
+# （防御力可无限提升，但最高只能获得57%伤害减免）
 def hurt_defensive_calculate(hurt, defensive):
     percent = 0.0
     if defensive <= 100:
@@ -144,7 +156,7 @@ def hurt_defensive_calculate(hurt, defensive):
         if defensive <= 1000:
             percent = 100 * 0.0012 + (defensive - 100) * 0.0005
         else:
-            percent = 100 * 0.001 + 900 * 0.0005
+            percent = 100 * 0.0012 + 900 * 0.0005
     return hurt - hurt * percent
 
 
@@ -203,6 +215,7 @@ class Role:
         self.role_icon = None  # 角色头像
         self.player_num = 0  # 玩家在这个房间的编号
         self.room_obj = None  # 房间对象
+        self.position = '' # 角色定位
 
         self.attr = {}  # 角色属性列表
         '''
@@ -239,6 +252,7 @@ class Role:
             self.name = role_data['name']
             self.role_icon = Image.open(image)
             self.room_obj: PCRScrimmage = room_obj
+            self.position = role_data['position']
 
             self.attr[Attr.MAX_HEALTH] = role_data['health']
             self.attr[Attr.NOW_HEALTH] = self.attr[Attr.MAX_HEALTH]
@@ -254,6 +268,19 @@ class Role:
 
             self.active_skills = role_data['active_skills']
             self.passive_skills = role_data['passive_skills']
+        bonus_dict = get_skill_bonus(self.user_id, self.position, SKILL_DICT_ALL)
+        for k,v in bonus_dict.items():
+            if k == "defend":
+                self.attr[Attr.DEFENSIVE] += v
+            if k == "health":
+                self.attr[Attr.MAX_HEALTH] += v
+                self.attr[Attr.NOW_HEALTH] += v
+            if k == "attack":
+                self.attr[Attr.ATTACK] += v
+            if k == "distance":
+                self.attr[Attr.DISTANCE] += v
+            if k == "tp":
+                self.attr[Attr.NOW_TP] += v
 
     # 属性数值改变的统一处理
     def attrChange(self, attr_type, num):
@@ -435,7 +462,8 @@ class PCRScrimmage:
         self.now_playing_players = []  # 当前正在游玩的玩家id	[xxx, xxx]
         self.rank = {}  # 结算排行	{1:xxx,2:xxx}
         self.player_satge_timer = 0  # 玩家阶段计时器。回合切换时重置
-        self.is_debug = is_debug
+        self.is_debug = is_debug # 是否是测试服(已弃用)
+        self.is_selected = [] # 是否已经被选
 
         self.user_card_dict = {}  # 群内所有成员信息
 
@@ -1293,6 +1321,7 @@ class PCRScrimmage:
 class manager:
     def __init__(self):
         self.playing: List[PCRScrimmage] = {}
+
     def is_playing(self, gid):
         return gid in self.playing
 
@@ -1301,10 +1330,6 @@ class manager:
 
     def get_game(self, gid):
         return self.playing[gid] if gid in self.playing else None
-
-    def is_debug_game(self, gid):
-        return self.playing[gid].is_debug
-
 
 mgr = manager()
 WAIT_TIME = 3  # 每x秒检查一次房间状态
@@ -1318,7 +1343,6 @@ STAGE_WAIT_TIME = 30  # 玩家阶段等待时间，超过这个时间判负。
 @create.handle()
 async def game_create(bot, ev: GroupMessageEvent):
     gid, uid = ev.group_id, ev.user_id
-
     if mgr.is_playing(gid):
         await create.finish('有另一局游戏仍在进行中…')
     image = IMAGE_PATH / f'{gid}.png'
@@ -1327,7 +1351,8 @@ async def game_create(bot, ev: GroupMessageEvent):
     from extensive_plugin import pcr_scrimmage_debug
     if pcr_scrimmage_debug.mgr.is_playing(gid):
         await create.finish('有测试服游戏正在进行中...')
-    with mgr.start(gid, uid, is_debug=False) as scrimmage:
+
+    with mgr.start(gid, uid, is_debug=True) as scrimmage:
         msg = ['大乱斗房间已创建，等待加入中。。。',
                f'{WAIT_TIME}分钟后不开始会自动结束',
                f'当前人数({scrimmage.getPlayerNum()}/{MAX_PLAYER})',
@@ -1360,10 +1385,19 @@ async def game_create(bot, ev: GroupMessageEvent):
             for i in range(len(scrimmage.rank)):
                 user_card = uid2card(scrimmage.rank[i + 1], scrimmage.user_card_dict)
                 puid = scrimmage.rank[i+1]
+                player = scrimmage.getPlayerObj(puid)
+                skill_rate = SKILL_RATE_DICT[len(scrimmage.rank)][i]
+                global SKILL_DICT_ALL
+                SKILL_DICT_ALL = update_skill_data(puid, player.position, SKILL_DICT_ALL, skill_rate)
+                save_skill_data(SKILL_DICT_ALL)
+                if skill_rate > 0:
+                    skill_msg = f',且对 {player.position} 角色的熟练度提高了！'
+                else:
+                    skill_msg = ''
                 gold = GOLD_DICT[len(scrimmage.rank)][i]
                 await BagUser.add_gold(puid,gid,gold)
                 gold_msg = f',获得{gold}金币'
-                msg.append(f'第{i + 1}名：{user_card}{gold_msg}')
+                msg.append(f'第{i + 1}名：{user_card}{gold_msg}{skill_msg}')
             await bot.send(ev, '\n'.join(msg))
         else:
             await bot.send(ev, f'游戏结束')
@@ -1372,7 +1406,6 @@ async def game_create(bot, ev: GroupMessageEvent):
 @join.handle()
 async def game_join(bot, ev: GroupMessageEvent):
     gid, uid = ev.group_id, ev.user_id
-
 
     scrimmage = mgr.get_game(gid)
     if not scrimmage or scrimmage.now_statu != NOW_STATU_WAIT:
@@ -1407,10 +1440,32 @@ async def game_start(bot, ev: GroupMessageEvent):
         await start.finish('要两个人以上才能开始', at_sender=True)
 
     scrimmage.now_statu = NOW_STATU_SELECT_ROLE
-    role_list = '游戏开始，请选择角色，当前可选角色：\n（'
+
+    role_list = '游戏开始，请选择角色，当前可选角色：\n'
+    msgd = ''
+    msga = ''
+    msgb = ''
+    msgs = ''
     for role in ROLE.values():
-        role_list += f'{role["name"]} '
-    role_list += ')\n输入“角色详情 角色名” 可查看角色属性和技能\n（所有人都选择角色后自动开始）\n'
+        if role["position"] == POSITION_DEFEND:
+            msgd += f'{role["name"]} '
+        if role["position"] == POSITION_ATTACK:
+            msga += f'{role["name"]} '
+        if role["position"] == POSITION_BURST:
+            msgb += f'{role["name"]} '
+        if role["position"] == POSITION_SPECIAL:
+            msgs += f'{role["name"]} '
+    role_list += '————————————————————\n'
+    role_list += '防御：\n'
+    role_list += msgd
+    role_list += '\n——————————————————\n输出：\n'
+    role_list += msga
+    role_list += '\n——————————————————\n爆发：\n'
+    role_list += msgb
+    role_list += '\n——————————————————\n特殊：\n'
+    role_list += msgs
+    role_list += '\n——————————————————'
+    role_list += '\n输入“角色详情 角色名” 可查看角色属性和技能\n输入"查看熟练度"可查看你的熟练度\n（所有人都选择角色后自动开始）\n'
     for player_id in scrimmage.player_list:
         role_list += message_builder.at(player_id)
     await bot.send(ev, role_list)
@@ -1430,8 +1485,17 @@ async def select_role(bot, ev: GroupMessageEvent):
 
     characterid = chara.name2id(ev.message.extract_plain_text())
     if characterid != chara.UNKNOWN and characterid in ROLE:
+        if characterid in scrimmage.is_selected:
+            await selectcha.finish('这个角色已经被其他玩家选择了', at_sender=True)
+
+        scrimmage.is_selected.append(characterid)
         player = scrimmage.getPlayerObj(uid)
         player.initData(characterid, scrimmage)
+        skilllevel = get_skill_level(uid, player.position, SKILL_DICT_ALL)
+        if skilllevel == SKILL_RATE_NEW:
+            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},没有获得任何熟练度奖励。继续努力吧！', at_sender=True)
+        else:
+            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},发送"熟练度奖励"来查询你获得的熟练度奖励', at_sender=True)
 
         img = player.role_icon
         img.save(image)
@@ -1443,6 +1507,35 @@ async def select_role(bot, ev: GroupMessageEvent):
             await bot.send(ev, "所有人都选择了角色，大乱斗即将开始！\n碾碎他们")
             await asyncio.sleep(PROCESS_WAIT_TIME)
             scrimmage.now_statu = NOW_STATU_OPEN
+
+@skillbonus.handle()
+async def bonus(bot, ev: GroupMessageEvent):
+    gid, uid = ev.group_id, ev.user_id
+    scrimmage = mgr.get_game(gid)
+
+    if not scrimmage or not scrimmage.now_statu in (NOW_STATU_OPEN,NOW_STATU_SELECT_ROLE):
+        return
+    if uid not in scrimmage.player_list:
+        await skillbonus.finish('你还没有选择任何角色', at_sender=True)
+
+    player = scrimmage.getPlayerObj(uid)
+    skilllevel = get_skill_level(uid, player.position, SKILL_DICT_ALL)
+    if skilllevel == SKILL_RATE_NEW:
+        await skillbonus.finish('你当前没有获得任何熟练度奖励。继续努力吧！')
+    bonus_dict = get_skill_bonus(uid, player.position, SKILL_DICT_ALL)
+    msg = '你的熟练度奖励如下：'
+    for k, v in bonus_dict.items():
+        if k == "defend":
+            msg += f'\n防御力+{v}'
+        if k == "health":
+            msg += f'\n生命值+{v}'
+        if k == "attack":
+            msg += f'\n攻击力+{v}'
+        if k == "distance":
+            msg += f'\n攻击距离+{v}'
+        if k == "tp":
+            msg += f'\n初始tp值+{v}'
+    await skillbonus.finish(msg, at_sender=True)
 
 
 @dice.handle()
@@ -1582,6 +1675,7 @@ async def check_role(bot, ev: GroupMessageEvent, arg: Message = CommandArg()):
         role_info = ROLE[characterid]
         msg = [
             f"名字：{role_info['name']}",
+            f"角色定位：{role_info['position']}",
             f"生命值：{role_info['health']}",
             f"TP：{role_info['tp']}",
             f"攻击距离：{role_info['distance']}",
@@ -1600,13 +1694,13 @@ async def check_role(bot, ev: GroupMessageEvent, arg: Message = CommandArg()):
 
 
 @finish.handle()
-async def game_end(bot, ev: GroupMessageEvent, matcher: Matcher):
+async def game_end(bot, ev: GroupMessageEvent):
     gid, uid = ev.group_id, ev.user_id
 
     scrimmage = mgr.get_game(gid)
     if not scrimmage or scrimmage.now_statu == NOW_STATU_END:
         return
-    if not matcher.permission == GROUP_ADMIN and not uid == scrimmage.room_master:
+    if not await GROUP_ADMIN(bot, ev) and not await GROUP_OWNER(bot, ev) and not uid == scrimmage.room_master:
         await finish.finish('只有群管理或房主才能强制结束', at_sender=True)
 
     scrimmage.now_statu = NOW_STATU_END
@@ -1633,8 +1727,29 @@ async def game_help_all_role(bot, ev: GroupMessageEvent):
 
 @character.handle()
 async def game_help_rule(bot, ev: GroupMessageEvent):
-    msg = '当前可选角色有：\n'
+    msgd = ''
+    msga = ''
+    msgb = ''
+    msgs = ''
     for role in ROLE.values():
-        msg += f'{role["name"]} '
+        if role["position"] == POSITION_DEFEND:
+            msgd += f'{role["name"]} '
+        if role["position"] == POSITION_ATTACK:
+            msga += f'{role["name"]} '
+        if role["position"] == POSITION_BURST:
+            msgb += f'{role["name"]} '
+        if role["position"] == POSITION_SPECIAL:
+            msgs += f'{role["name"]} '
+    msg = '当前可选角色有：\n'
+    msg += '————————————————————\n'
+    msg += '防御：\n'
+    msg += msgd
+    msg += '\n——————————————————\n输出：\n'
+    msg += msga
+    msg += '\n——————————————————\n爆发：\n'
+    msg += msgb
+    msg += '\n——————————————————\n特殊：\n'
+    msg += msgs
+    msg += '\n——————————————————'
     msg += f'\n共{len(ROLE)}位角色'
     await bot.send(ev, msg)

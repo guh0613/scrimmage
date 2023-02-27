@@ -91,7 +91,7 @@ def get_skill_bonus(uid, position: str, skill_dict_all: Dict):
     bonus_dict = {}
     if not uid in skill_dict_all.keys():
         skill_dict_all[uid] = {"defend": 0, "attack": 0, "burst": 0, "special": 0}
-        return 0
+        return {}
     skilllevel = get_skill_level(uid, position, skill_dict_all)
     if position == "防御型":
         if skilllevel == SKILL_RATE_ONHAND:

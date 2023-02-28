@@ -590,6 +590,8 @@ class PCRScrimmage:
                 if next_turn_player.skip_turn == 0 and next_turn_player.now_stage == NOW_STAGE_FAKEOUT:
                     next_turn_player.stageChange(NOW_STAGE_WAIT)
                     next_turn_player.attr[Attr.NOW_HEALTH] = next_turn_player.attr[Attr.MAX_HEALTH]
+                    next_turn_player.attr[Attr.ATTACK] += 80
+                    next_turn_player.attr[Attr.CRIT] += 15
                     key = getkey(self.rank, next_turn_player.user_id)
                     self.rank.pop(key)
                     temp = {}
@@ -1063,8 +1065,11 @@ class PCRScrimmage:
         if EFFECT_KILL_REBORN in skill_effect:
             if goal_player.user_id == use_skill_player.revenge and goal_player.now_stage in (NOW_STAGE_OUT, NOW_STAGE_FAKEOUT):
                 num = skill_effect[EFFECT_KILL_REBORN]
-                use_skill_player.reborn_turn = num
-                back_msg.append(f'{use_player_name}完成了复仇，复活所需的回合数缩短为了{num}！')
+                if use_skill_player.reborn_turn > 1:
+                    use_skill_player.reborn_turn -= num
+                    back_msg.append(f'{use_player_name}完成了复仇，复活所需的回合数缩短了{num}！')
+                else:
+                    back_msg.append(f'{use_player_name}完成了复仇，但复活所需的回合数已经不能再缩短了！')
 
         # 回合锁定效果
         if EFFECT_LOCKTURN in skill_effect:
@@ -1082,6 +1087,8 @@ class PCRScrimmage:
         # 缩短复活回合数效果
         if EFFECT_REBORN in skill_effect:
             num = skill_effect[EFFECT_REBORN]
+            if goal_player.reborn_turn <= num:
+                return RET_ERROR, '使用此技能不会有任何效果！请选择其他技能'
             goal_player.reborn_turn = num
             back_msg.append(f'{use_player_name}的复活所需回合数缩短为了{num}！')
 
@@ -1654,7 +1661,7 @@ async def use_skill(bot, ev: GroupMessageEvent):
     # 回合切换
     result = scrimmage.turnChange()
     if result != 0:
-        await skill.send(message_builder.at(result) + "将在下一回合复活！")
+        await skill.send(message_builder.at(result) + "已经复活！")
 
     scrimmage.refreshNowImageStatu()  # 刷新当前显示状态
 
@@ -1771,7 +1778,7 @@ async def game_help_all_role(bot, ev: GroupMessageEvent):
 
 @version.handle()
 async def _(bot, ev: GroupMessageEvent):
-    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.7\n更新时间：2023-2-28\n—————————\n正式服:\n当前版本：1.6.2\n更新时间：2023-2-28")
+    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.7pre2\n更新时间：2023-2-28\n—————————\n正式服:\n当前版本：1.6.2\n更新时间：2023-2-28")
 
 @skillrate.handle()
 async def _(bot, ev: GroupMessageEvent):

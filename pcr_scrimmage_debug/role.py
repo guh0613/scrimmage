@@ -2239,7 +2239,7 @@ ROLE = {
             {
                 "name": "躁动起来!",
                 "text": "向前移动3格并触发跑道事件，强化下一次普通攻击，使其暴击率与暴击伤害提升50%与0.2倍",
-                "tp_cost": 15,
+                "tp_cost": 20,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 
@@ -2255,7 +2255,7 @@ ROLE = {
             {
                 "name": "开溜!",
                 "text": "向后移动5格并触发跑道事件，强化下一次普通攻击，使其暴击率与暴击伤害提升50%与0.2倍",
-                "tp_cost": 20,
+                "tp_cost": 25,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 
@@ -2430,9 +2430,9 @@ ROLE = {
         "name": "源樱",
         "position": POSITION_SPECIAL,
         "passive": PASSIVE_REBORN,
-        "passive_text": "被击倒时只会暂时出局，并在3回合后复活",
+        "passive_text": "被击倒时只会暂时出局，并在3回合后复活，每次复活时获得80点攻击力与15%暴击率",
 
-        "health": 600,
+        "health": 500,
         "distance": 6,
         "attack": 80,
         "defensive": 50,
@@ -2453,7 +2453,7 @@ ROLE = {
             },
             {
                 "name": "复仇",
-                "text": "对目标造成150(+1.5自身攻击力)伤害，若目标为自己的'杀人凶手'，则必定暴击；若复仇成功，则复活所需的回合数缩短为1",
+                "text": "对目标造成150(+1.5自身攻击力)伤害，若目标为自己的'杀人凶手'，则必定暴击；若复仇成功，则复活所需的回合数缩短1",
                 "tp_cost": 30,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
@@ -2467,7 +2467,7 @@ ROLE = {
             {
                 "name": "坚强意志",
                 "text": "在本局大乱斗中，复活所需的回合数缩短为2",
-                "tp_cost": 60,
+                "tp_cost": 55,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 

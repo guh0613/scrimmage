@@ -164,4 +164,5 @@ def get_skill_bonus(uid, position: str, skill_dict_all: Dict):
             return {}
         return bonus_dict
 
-
+def getkey(dict, item):
+    return list(dict.keys())[list(dict.values()).index(item)]

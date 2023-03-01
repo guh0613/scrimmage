@@ -95,7 +95,6 @@ if not os.path.exists(IMAGE_PATH):
 
 
 init_data()
-SKILL_DICT_ALL = load_skill_data()
 
 async def get_user_card_dict(bot, group_id):
     mlist = await bot.get_group_member_list(group_id=group_id)
@@ -252,7 +251,7 @@ class Role:
             self.passive = role_data['passive'] if role_data.get('passive', -1) != -1 else ''
             self.active_skills = role_data['active_skills']
             self.passive_skills = role_data['passive_skills']
-        bonus_dict = get_skill_bonus(self.user_id, self.position, SKILL_DICT_ALL)
+        bonus_dict = get_skill_bonus(self.user_id, self.position, load_skill_data())
         for k,v in bonus_dict.items():
             if k == "defend":
                 self.attr[Attr.DEFENSIVE] += v
@@ -1432,9 +1431,9 @@ async def game_create(bot, ev: GroupMessageEvent):
                 puid = scrimmage.rank[i+1]
                 player = scrimmage.getPlayerObj(puid)
                 skill_rate = SKILL_RATE_DICT[len(scrimmage.rank)][i]
-                global SKILL_DICT_ALL
-                SKILL_DICT_ALL = update_skill_data(puid, player.position, SKILL_DICT_ALL, skill_rate)
-                save_skill_data(SKILL_DICT_ALL)
+                skill_dict = load_skill_data()
+                skill_dict = update_skill_data(puid, player.position, skill_dict, skill_rate)
+                save_skill_data(skill_dict)
                 if skill_rate > 0:
                     skill_msg = f',且对 {player.position} 角色的熟练度提高了！'
                 else:
@@ -1510,7 +1509,7 @@ async def game_start(bot, ev: GroupMessageEvent):
     role_list += '\n——————————————————\n特殊：\n'
     role_list += msgs
     role_list += '\n——————————————————'
-    role_list += '\n输入“角色详情 角色名” 可查看角色属性和技能\n输入"查看熟练度"可查看你的熟练度\n（所有人都选择角色后自动开始）\n'
+    role_list += '\n输入“内测角色详情 角色名” 可查看角色属性和技能\n输入"查看熟练度"可查看你的熟练度\n（所有人都选择角色后自动开始）\n'
     for player_id in scrimmage.player_list:
         role_list += message_builder.at(player_id)
     await bot.send(ev, role_list)
@@ -1536,7 +1535,8 @@ async def select_role(bot, ev: GroupMessageEvent):
         scrimmage.is_selected.append(characterid)
         player = scrimmage.getPlayerObj(uid)
         player.initData(characterid, scrimmage)
-        skilllevel = get_skill_level(uid, player.position, SKILL_DICT_ALL)
+        skill_dict = load_skill_data()
+        skilllevel = get_skill_level(uid, player.position, skill_dict)
         if skilllevel == SKILL_RATE_NEW:
             await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},没有获得任何熟练度奖励。继续努力吧！',
                                  at_sender=True)
@@ -1566,10 +1566,11 @@ async def bonus(bot, ev: GroupMessageEvent):
         await skillbonus.finish('你还没有选择任何角色', at_sender=True)
 
     player = scrimmage.getPlayerObj(uid)
-    skilllevel = get_skill_level(uid, player.position, SKILL_DICT_ALL)
+    skill_dict = load_skill_data()
+    skilllevel = get_skill_level(uid, player.position, skill_dict)
     if skilllevel == SKILL_RATE_NEW:
         await skillbonus.finish('你当前没有获得任何熟练度奖励。继续努力吧！')
-    bonus_dict = get_skill_bonus(uid, player.position, SKILL_DICT_ALL)
+    bonus_dict = get_skill_bonus(uid, player.position, skill_dict)
     msg = '你的熟练度奖励如下：'
     for k, v in bonus_dict.items():
         if k == "defend":
@@ -1778,17 +1779,17 @@ async def game_help_all_role(bot, ev: GroupMessageEvent):
 
 @version.handle()
 async def _(bot, ev: GroupMessageEvent):
-    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.7pre2\n更新时间：2023-2-28\n—————————\n正式服:\n当前版本：1.6.2\n更新时间：2023-2-28")
+    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.7\n更新时间：2023-3-1\n—————————\n正式服:\n当前版本：1.7\n更新时间：2023-3-1")
 
 @skillrate.handle()
 async def _(bot, ev: GroupMessageEvent):
     uid = ev.user_id
     name = ev.sender.card or ev.sender.nickname
-    global SKILL_DICT_ALL
-    if not str(uid) in SKILL_DICT_ALL.keys():
-        SKILL_DICT_ALL = create_skill_data(uid, SKILL_DICT_ALL)
-        save_skill_data(SKILL_DICT_ALL)
-    judge = get_skill_level(uid, "all", SKILL_DICT_ALL)
+    skill_dict = load_skill_data()
+    if not str(uid) in skill_dict.keys():
+        skill_dict = create_skill_data(uid, skill_dict)
+        save_skill_data(skill_dict)
+    judge = get_skill_level(uid, "all", skill_dict)
     msg = f"玩家 {name} 的熟练度信息\n"
     msg += f"防御: {judge[0]}\n"
     msg += f"输出: {judge[1]}\n"

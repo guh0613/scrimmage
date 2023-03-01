@@ -2364,6 +2364,7 @@ ROLE = {
 
                 "effect": {
                     EFFECT_BUFF: [(BuffType.TurnAttrHelDown3, -220, 2)],
+                    EFFECT_ATTR_CHANGE: [(Attr.NOW_HEALTH, 800, 0, 0)],
                     EFFECT_SKILL_CHANGE: (BuffType.heai, [2]),
                 }
             },
@@ -2454,7 +2455,7 @@ ROLE = {
             {
                 "name": "复仇",
                 "text": "对目标造成150(+1.5自身攻击力)伤害，若目标为自己的'杀人凶手'，则必定暴击；若复仇成功，则复活所需的回合数缩短1",
-                "tp_cost": 30,
+                "tp_cost": 25,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
@@ -2467,7 +2468,7 @@ ROLE = {
             {
                 "name": "坚强意志",
                 "text": "在本局大乱斗中，复活所需的回合数缩短为2",
-                "tp_cost": 55,
+                "tp_cost": 50,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 

@@ -79,6 +79,9 @@ EFFECT_SKILL_CHANGE = "skill_change"  # 更改技能			tuple	(BuffType.xx, [被�
 EFFECT_JUMP = "jump"  # 选择目标的移动效果，移动到目标身边，参数随便填，不会用到
 # 效果相对比较特殊，最好放在被动且搭配TRIGGER_SELECT_EXCEPT_ME使用
 
+EFFECT_REVENGE = "revenge"
+EFFECT_KILL_REBORN = "kill_reborn"
+EFFECT_REBORN = "reborn"
 EFFECT_TP_LOCKTURN = "tp_lockturn"
 EFFECT_OUT_TP = "make_it_out_tp"  # 令目标出局时tp变动		number
 EFFECT_OUT_LOCKTURN = "make_it_out_turn"  # 令目标出局时锁定回合	number	锁定回合：不会切换到下一个玩家，当前玩家继续丢色子和放技能
@@ -98,6 +101,8 @@ POSITION_ATTACK = "输出型" # 输出，持续输出兼顾发育的定位
 POSITION_BURST = "爆发型" # 爆发，以高爆发输出秒人的定位
 POSITION_SPECIAL = "特殊型" # 特殊，拥有独特技能效果的定位
 
+# 被动技能列表
+PASSIVE_REBORN = "reborn"
 
 from .attr import Attr
 from .buff import BuffType
@@ -2234,7 +2239,7 @@ ROLE = {
             {
                 "name": "躁动起来!",
                 "text": "向前移动3格并触发跑道事件，强化下一次普通攻击，使其暴击率与暴击伤害提升50%与0.2倍",
-                "tp_cost": 15,
+                "tp_cost": 20,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 
@@ -2250,7 +2255,7 @@ ROLE = {
             {
                 "name": "开溜!",
                 "text": "向后移动5格并触发跑道事件，强化下一次普通攻击，使其暴击率与暴击伤害提升50%与0.2倍",
-                "tp_cost": 20,
+                "tp_cost": 25,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 
@@ -2359,6 +2364,7 @@ ROLE = {
 
                 "effect": {
                     EFFECT_BUFF: [(BuffType.TurnAttrHelDown3, -220, 2)],
+                    EFFECT_ATTR_CHANGE: [(Attr.NOW_HEALTH, 800, 0, 0)],
                     EFFECT_SKILL_CHANGE: (BuffType.heai, [2]),
                 }
             },
@@ -2419,6 +2425,59 @@ ROLE = {
                                          (Attr.ATTACK, -1000, 0, 0)],
                 }
             },
+        ]
+    },
+    5103: {
+        "name": "源樱",
+        "position": POSITION_SPECIAL,
+        "passive": PASSIVE_REBORN,
+        "passive_text": "被击倒时只会暂时出局，并在3回合后复活，每次复活时获得80点攻击力与15%暴击率",
+
+        "health": 500,
+        "distance": 6,
+        "attack": 80,
+        "defensive": 50,
+        "crit": 10,
+        "tp": 0,
+
+        "active_skills": [
+            {
+                "name": "普通攻击",
+                "text": "对目标造成50(+1.0自身攻击力)伤害(可以攻击自己)",
+                "tp_cost": 0,
+                "trigger": TRIGGER_SELECT,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_HURT: (50, Attr.ATTACK, 0, 1.0, False)
+                }
+            },
+            {
+                "name": "复仇",
+                "text": "对目标造成150(+1.5自身攻击力)伤害，若目标为自己的'杀人凶手'，则必定暴击；若复仇成功，则复活所需的回合数缩短1",
+                "tp_cost": 25,
+                "trigger": TRIGGER_SELECT_EXCEPT_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_HURT: (150, Attr.ATTACK, 0, 1.5, False),
+                    EFFECT_REVENGE: 1,
+                    EFFECT_KILL_REBORN: 1
+                }
+            },
+            {
+                "name": "坚强意志",
+                "text": "在本局大乱斗中，复活所需的回合数缩短为2",
+                "tp_cost": 50,
+                "trigger": TRIGGER_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_REBORN: 2
+                }
+            },
+        ],
+        "passive_skills": [
         ]
     },
 }

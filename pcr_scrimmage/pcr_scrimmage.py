@@ -38,7 +38,8 @@ from models.bag_user import BagUser
 
 from . import chara
 from .utils.utils import (init_data, load_skill_data, create_skill_data, get_skill_level, save_skill_data, update_skill_data, get_skill_bonus
-                            , SKILL_RATE_LEGEND, SKILL_RATE_MASTER, SKILL_RATE_ADVANCED, SKILL_RATE_SKILFUL, SKILL_RATE_ONHAND, SKILL_RATE_NEW)
+                            , SKILL_RATE_LEGEND, SKILL_RATE_MASTER, SKILL_RATE_ADVANCED, SKILL_RATE_SKILFUL, SKILL_RATE_ONHAND, SKILL_RATE_NEW
+                          , getkey)
 from .attr import Attr, AttrTextChange
 from .buff import BuffEffectType, BuffTriggerType, Buff, BuffType
 from .runway_case import (CASE_NONE, CASE_ATTACK, CASE_DEFENSIVE, CASE_HEALTH,
@@ -48,40 +49,16 @@ from .role import (EFFECT_BUFF, EFFECT_BUFF_BY_BT, EFFECT_DIZZINESS, EFFECT_HIT_
                    EFFECT_HURT, EFFECT_ATTR_CHANGE, EFFECT_MOVE, EFFECT_MOVE_GOAL, EFFECT_LIFESTEAL,
                    EFFECT_OUT_TP, EFFECT_OUT_LOCKTURN, EFFECT_IGNORE_DIST, EFFECT_AOE, EFFECT_ELIMINATE,
                    TRIGGER_ME, TRIGGER_ALL_EXCEPT_ME, TRIGGER_ALL, TRIGGER_SELECT, TRIGGER_SELECT_EXCEPT_ME,
-                   TRIGGER_NEAR, EFFECT_DEL_BUFF, EFFECT_TP_LOCKTURN,POSITION_DEFEND,POSITION_SPECIAL,POSITION_BURST,POSITION_ATTACK)
-__zx_plugin_name__ = "大乱斗"
+                   TRIGGER_NEAR, EFFECT_DEL_BUFF, EFFECT_TP_LOCKTURN, POSITION_DEFEND, POSITION_SPECIAL, POSITION_BURST,
+                   POSITION_ATTACK
+, PASSIVE_REBORN, EFFECT_REBORN, EFFECT_REVENGE, EFFECT_KILL_REBORN)
+__zx_plugin_name__ = "大乱斗(测试服)"
 __plugin_usage__ = """
 usage：
-    基础命令：
-	1、大乱斗规则
-	可查看大乱斗相关规则
-	2、大乱斗角色
-	可查看所有可用角色
-	3、角色详情 （角色名）
-	如：角色详情 黑猫
-	可查看角色的基础属性和技能
-	4、结束大乱斗
-	可以强制结束正在进行的大乱斗游戏
-	（该命令只有管理员和房主可用）
-一、创建阶段：
-	1、创建大乱斗
-	2、加入大乱斗
-	3、开始大乱斗
-二、选择角色阶段：
-	1、（角色名）
-	如：凯露 / 黑猫
-	（名字和外号都行）
-三、对战阶段：
-	1、丢色子
-	2、（技能编号） @xxx
-	如：1 @xxx
-	发送技能编号并@目标，如果这个技能不需要指定目标，直接发送技能编号即可
-	3、查看属性
-	可查看自己当前角色详细属性
-	4、投降 / 认输
+    大乱斗测试服，用于游戏测试和新内容体验。使用"创建内测大乱斗/加入内测大乱斗/开始内测大乱斗"进行一局游戏。
 """.strip()
-__plugin_des__ = "进行一场激动人心的大乱斗"
-__plugin_cmd__ = ["大乱斗规则/创建大乱斗"]
+__plugin_des__ = "大乱斗测试服"
+__plugin_cmd__ = ["创建内测大乱斗"]
 __plugin_type__ = ("群内小游戏",)
 __plugin_version__ = 1.0
 __plugin_author__ = "egggi"
@@ -89,7 +66,7 @@ __plugin_settings__ = {
     "level": 5,  # 群权限等级，请不要设置为1或999，若无特殊情况请设置为5
     "default_status": True,  # 进群时的默认开关状态
     "limit_superuser": False,  # 开关插件的限制是否限制超级用户
-    "cmd": ['大乱斗'],  # 命令别名，主要用于帮助和开关
+    "cmd": ['内测大乱斗'],  # 命令别名，主要用于帮助和开关
 }
 
 info = on_command("角色详情", priority=5, block=True)
@@ -104,7 +81,6 @@ selectcha = on_message(priority=999, block=True)
 start = on_fullmatch("开始大乱斗", priority=5, block=True)
 join = on_fullmatch("加入大乱斗", priority=5, block=True)
 create = on_fullmatch("创建大乱斗", priority=5, block=True)
-skillbonus = on_fullmatch("熟练度奖励", priority=5, block=True)
 
 FILE_PATH = os.path.dirname(__file__)
 
@@ -116,7 +92,6 @@ if not os.path.exists(IMAGE_PATH):
 
 
 init_data()
-SKILL_DICT_ALL = load_skill_data()
 
 async def get_user_card_dict(bot, group_id):
     mlist = await bot.get_group_member_list(group_id=group_id)
@@ -189,6 +164,7 @@ NOW_STAGE_WAIT = 0  # 等待
 NOW_STAGE_DICE = 1  # 丢色子
 NOW_STAGE_SKILL = 2  # 释放技能
 NOW_STAGE_OUT = 3  # 出局
+NOW_STAGE_FAKEOUT = 4 # 假死
 
 MAX_PLAYER = 4  # 最大玩家数量
 MAX_CRIT = 100  # 最大暴击
@@ -238,7 +214,10 @@ class Role:
         self.now_location = 0  # 当前位置
         self.now_stage = NOW_STAGE_WAIT  # 当前处于什么阶段
         self.skip_turn = 0  # 跳过x回合
+        self.reborn_turn = 3 # 复活所需回合数
+        self.revenge = 0 # 复仇对象
 
+        self.passive = ''
         self.active_skills = []  # 技能列表
         self.passive_skills = []  # 被动列表
 
@@ -266,9 +245,11 @@ class Role:
 
             self.attr[Attr.COST_HEALTH] = 0
 
+            self.passive = role_data['passive'] if role_data.get('passive', -1) != -1 else ''
             self.active_skills = role_data['active_skills']
             self.passive_skills = role_data['passive_skills']
-        bonus_dict = get_skill_bonus(self.user_id, self.position, SKILL_DICT_ALL)
+        skill_dict = load_skill_data()
+        bonus_dict = get_skill_bonus(self.user_id, self.position, skill_dict)
         for k,v in bonus_dict.items():
             if k == "defend":
                 self.attr[Attr.DEFENSIVE] += v
@@ -284,7 +265,7 @@ class Role:
 
     # 属性数值改变的统一处理
     def attrChange(self, attr_type, num):
-        if self.now_stage == NOW_STAGE_OUT: return
+        if self.now_stage in (NOW_STAGE_OUT, NOW_STAGE_FAKEOUT): return
 
         # 属性数值改变前的处理
         if attr_type == Attr.NOW_HEALTH and num < 0:
@@ -323,13 +304,16 @@ class Role:
         if self.attr[attr_type] <= 0:
             self.attr[attr_type] = 0
             if attr_type == Attr.NOW_HEALTH:
-                # 如果是生命值降为0，则调用出局接口
-                self.room_obj.outDispose(self)
+                if self.passive == PASSIVE_REBORN:
+                    self.room_obj.outDispose(self, True, self.reborn_turn)
+                else:
+                    # 如果是生命值降为0，则调用出局接口
+                    self.room_obj.outDispose(self)
         return self.attr[attr_type]
 
     # 位置改变	flag:如果为真，则直接设置固定位置；如果为假，根据原位置改变
     def locationChange(self, num, runway, flag=False):
-        if self.now_stage == NOW_STAGE_OUT: return
+        if self.now_stage in (NOW_STAGE_OUT, NOW_STAGE_FAKEOUT): return
         runway[self.now_location]["players"].remove(self.user_id)
         if flag:
             self.now_location = num
@@ -576,6 +560,7 @@ class PCRScrimmage:
 
     # 回合改变，到下一个玩家
     def turnChange(self):
+        readytoreborn = 0
         now_turn_player: Role = self.getNowTurnPlayerObj()
         if now_turn_player.now_stage != NOW_STAGE_OUT:  # 如果当前玩家已经出局，则不改变状态
             now_turn_player.stageChange(NOW_STAGE_WAIT)  # 已结束的玩家
@@ -587,7 +572,7 @@ class PCRScrimmage:
         # 游戏胜利或结束则直接退出
         if (self.now_statu == NOW_STATU_WIN or
                 self.now_statu == NOW_STATU_END):
-            return
+            return readytoreborn
 
         skip_flag = False
         i = 0
@@ -599,6 +584,20 @@ class PCRScrimmage:
             next_turn_player = self.getNowTurnPlayerObj()  # 下一个玩家
             if next_turn_player.skip_turn > 0:  # 跳过被眩晕的玩家
                 next_turn_player.skip_turn -= 1
+                if next_turn_player.skip_turn == 0 and next_turn_player.now_stage == NOW_STAGE_FAKEOUT:
+                    next_turn_player.stageChange(NOW_STAGE_WAIT)
+                    next_turn_player.attr[Attr.NOW_HEALTH] = next_turn_player.attr[Attr.MAX_HEALTH]
+                    next_turn_player.attr[Attr.ATTACK] += 80
+                    next_turn_player.attr[Attr.CRIT] += 15
+                    key = getkey(self.rank, next_turn_player.user_id)
+                    self.rank.pop(key)
+                    temp = {}
+                    for k in self.rank.keys():
+                        if k < key:
+                            temp[k+1] = self.rank[k]
+                    self.rank.update(temp)
+                    self.now_playing_players.append(next_turn_player.user_id)
+                    readytoreborn = next_turn_player.user_id
                 skip_flag = True
                 continue
             if next_turn_player.now_stage != NOW_STAGE_OUT:  # 跳过已出局的玩家
@@ -606,9 +605,9 @@ class PCRScrimmage:
                     now_turn_player.stageChange(NOW_STAGE_DICE)
                     self.now_turn = now_turn_player.player_num
                     self.lock_turn -= 1
-                    return
+                    return readytoreborn
                 next_turn_player.stageChange(NOW_STAGE_DICE)
-                return
+                return readytoreborn
             if skip_flag:  # 如果检测到有跳过眩晕玩家，则重新循环
                 i = 0
                 skip_flag = False
@@ -618,8 +617,12 @@ class PCRScrimmage:
         self.now_statu = NOW_STATU_END
 
     # 玩家出局处理
-    def outDispose(self, player: Role):
-        player.stageChange(NOW_STAGE_OUT)
+    def outDispose(self, player: Role, isfake=False, rebornturn=0):
+        if isfake:
+            player.stageChange(NOW_STAGE_FAKEOUT)
+            player.skip_turn = rebornturn
+        else:
+            player.stageChange(NOW_STAGE_OUT)
         self.rank[len(self.now_playing_players)] = player.user_id
         if player.user_id in self.now_playing_players:
             self.now_playing_players.remove(player.user_id)
@@ -651,6 +654,10 @@ class PCRScrimmage:
                 self.getPlayerObj(iter_player_id).attrChange(Attr.ATTACK, ROUND_ATTACK)
             self.dice_num = 1
 
+        if player.now_stage == NOW_STAGE_FAKEOUT:
+            await bot.send(ev, message_builder.at(player.user_id) + f'暂时出局并将在{player.reborn_turn}回合后复活！')
+            self.turnChange()  # 回合切换
+            self.refreshNowImageStatu()  # 刷新当前显示状态
         if player.now_stage == NOW_STAGE_OUT:
             await bot.send(ev, message_builder.at(player.user_id) + '出局')
             self.turnChange()  # 回合切换
@@ -761,6 +768,10 @@ class PCRScrimmage:
             await bot.send(ev, imgcode)
             await asyncio.sleep(1)
             await self.caseTrigger(player, bot, ev)
+        if player.now_stage == NOW_STAGE_FAKEOUT:
+            await bot.send(ev, message_builder.at(player.user_id) + f'暂时出局并将在{player.reborn_turn}回合后复活！')
+            self.turnChange()  # 回合切换
+            self.refreshNowImageStatu()  # 刷新当前显示状态
         if player.now_stage == NOW_STAGE_OUT:
             await bot.send(ev, message_builder.at(player.user_id) + '出局')
             self.turnChange()  # 回合切换
@@ -827,7 +838,7 @@ class PCRScrimmage:
                 goal_player_obj = self.getPlayerObj(goal_player_id)
                 if not goal_player_obj:
                     return RET_ERROR, '目标不在房间里'
-                if goal_player_obj.now_stage == NOW_STAGE_OUT:
+                if goal_player_obj.now_stage in (NOW_STAGE_OUT, NOW_STAGE_FAKEOUT):
                     return RET_ERROR, '目标已出局'
                 if skill_trigger == TRIGGER_SELECT_EXCEPT_ME and goal_player_obj == use_skill_player:
                     return RET_ERROR, '不能选择自己'
@@ -888,7 +899,7 @@ class PCRScrimmage:
 
     # 技能效果生效
     def skillEffect(self, use_skill_player: Role, goal_player: Role, skill_effect_base, back_msg: List):
-        if goal_player.now_stage == NOW_STAGE_OUT: return RET_NORMAL, ''
+        if goal_player.now_stage in (NOW_STAGE_OUT, NOW_STAGE_FAKEOUT): return RET_NORMAL, ''
 
         skill_effect: Dict = skill_effect_base.copy()  # 拷贝一份，避免修改保存在角色信息的技能效果
         use_player_name = uid2card(use_skill_player.user_id, self.user_card_dict)
@@ -1011,6 +1022,8 @@ class PCRScrimmage:
                     back_msg.append(f'{goal_player_name}降低了{abs(num)}点{text}')
                     if goal_player.now_stage == NOW_STAGE_OUT:
                         back_msg.append(f'{message_builder.at(goal_player.user_id)}出局')
+                    if goal_player.now_stage == NOW_STAGE_FAKEOUT:
+                        back_msg.append(f'{message_builder.at(goal_player.user_id)}暂时出局并将在{goal_player.reborn_turn}回合后复活！')
                 else:
                     back_msg.append(f'{goal_player_name}增加了{num}点{text}')
 
@@ -1022,6 +1035,10 @@ class PCRScrimmage:
             if goal_player.now_stage == NOW_STAGE_OUT:
                 use_skill_player.attrChange(Attr.NOW_TP, HIT_DOWN_TP)  # 击倒回复tp
                 back_msg.append(f'{message_builder.at(goal_player.user_id)}出局')
+            if goal_player.now_stage == NOW_STAGE_FAKEOUT:
+                use_skill_player.attrChange(Attr.NOW_TP, HIT_DOWN_TP)  # 击倒回复tp
+                goal_player.revenge = use_skill_player.user_id
+                back_msg.append(f'{message_builder.at(goal_player.user_id)}暂时出局并将在{goal_player.reborn_turn}回合后复活！')
 
         # tp达到指定值时锁定回合
         if EFFECT_TP_LOCKTURN in skill_effect:
@@ -1032,13 +1049,24 @@ class PCRScrimmage:
 
         # 效果击倒tp
         if EFFECT_OUT_TP in skill_effect:
-            if goal_player.now_stage == NOW_STAGE_OUT:
+            if goal_player.now_stage in (NOW_STAGE_OUT, NOW_STAGE_FAKEOUT):
                 num = skill_effect[EFFECT_OUT_TP]
                 use_skill_player.attrChange(Attr.NOW_TP, num)
+                extra_msg = '暂时' if goal_player.now_stage == NOW_STAGE_FAKEOUT else ''
                 if num < 0:
-                    back_msg.append(f'{goal_player_name}被击倒，{use_player_name}降低了{abs(num)}点TP')
+                    back_msg.append(f'{goal_player_name}{extra_msg}被击倒，{use_player_name}降低了{abs(num)}点TP')
                 else:
-                    back_msg.append(f'{goal_player_name}被击倒，{use_player_name}增加了{num}点TP')
+                    back_msg.append(f'{goal_player_name}{extra_msg}被击倒，{use_player_name}增加了{num}点TP')
+
+        # 复仇成功缩短复活时间
+        if EFFECT_KILL_REBORN in skill_effect:
+            if goal_player.user_id == use_skill_player.revenge and goal_player.now_stage in (NOW_STAGE_OUT, NOW_STAGE_FAKEOUT):
+                num = skill_effect[EFFECT_KILL_REBORN]
+                if use_skill_player.reborn_turn > 1:
+                    use_skill_player.reborn_turn -= num
+                    back_msg.append(f'{use_player_name}完成了复仇，复活所需的回合数缩短了{num}！')
+                else:
+                    back_msg.append(f'{use_player_name}完成了复仇，但复活所需的回合数已经不能再缩短了！')
 
         # 回合锁定效果
         if EFFECT_LOCKTURN in skill_effect:
@@ -1048,10 +1076,18 @@ class PCRScrimmage:
 
         # 击退回合锁定效果
         if EFFECT_OUT_LOCKTURN in skill_effect:
-            if goal_player.now_stage == NOW_STAGE_OUT:
+            if goal_player.now_stage in (NOW_STAGE_OUT, NOW_STAGE_FAKEOUT):
                 num = skill_effect[EFFECT_OUT_LOCKTURN]
                 self.lock_turn = num
                 back_msg.append(f'{use_player_name}锁定了{num}回合')
+
+        # 缩短复活回合数效果
+        if EFFECT_REBORN in skill_effect:
+            num = skill_effect[EFFECT_REBORN]
+            if goal_player.reborn_turn <= num:
+                return RET_ERROR, '使用此技能不会有任何效果！请选择其他技能'
+            goal_player.reborn_turn = num
+            back_msg.append(f'{use_player_name}的复活所需回合数缩短为了{num}！')
 
         # 眩晕效果
         if EFFECT_DIZZINESS in skill_effect:
@@ -1074,6 +1110,11 @@ class PCRScrimmage:
 
         use_skill_player.buffTriggerByTriggerType(BuffTriggerType.Attack)
         crit_flag = random.choice(range(0, MAX_CRIT)) < use_skill_player.attr[Attr.CRIT]
+
+        # 复仇
+        if EFFECT_REVENGE in skill_effect:
+            if use_skill_player.revenge != 0 and use_skill_player.revenge == goal_player.user_id:
+                crit_flag = True
 
         if addition_type != 0 and addition_prop != 0:  # 计算加成后的数值
             num = num + addition_goal.attr[addition_type] * addition_prop
@@ -1100,6 +1141,7 @@ class PCRScrimmage:
             add = math.floor(num * steal_prop)
             use_skill_player.attrChange(Attr.NOW_HEALTH, add)
             back_msg.append(f'{uid2card(use_skill_player.user_id, self.user_card_dict)}增加了{add}点生命值')
+
 
         # 判断一下是否有致盲buff
         num = use_skill_player.buffTriggerByBuffType(BuffType.Blind, num)
@@ -1164,7 +1206,7 @@ class PCRScrimmage:
         for player_id in self.player_list:
             player = self.getPlayerObj(player_id)
             if player == own_player: continue
-            if player.now_stage == NOW_STAGE_OUT: continue
+            if player.now_stage in (NOW_STAGE_OUT, NOW_STAGE_FAKEOUT): continue
             dist_list.append([player.user_id, self.getTwoPlayerDist(own_player, player)])
         # 极其低效的排序算法，时间复杂度为O(n^2)，数据量小，懒得改了_(:3)∠)_
         for i in range(len(dist_list)):  # 类似插入排序，从小到大
@@ -1387,9 +1429,9 @@ async def game_create(bot, ev: GroupMessageEvent):
                 puid = scrimmage.rank[i+1]
                 player = scrimmage.getPlayerObj(puid)
                 skill_rate = SKILL_RATE_DICT[len(scrimmage.rank)][i]
-                global SKILL_DICT_ALL
-                SKILL_DICT_ALL = update_skill_data(puid, player.position, SKILL_DICT_ALL, skill_rate)
-                save_skill_data(SKILL_DICT_ALL)
+                skill_dict = load_skill_data()
+                skill_dict = update_skill_data(puid, player.position, skill_dict, skill_rate)
+                save_skill_data(skill_dict)
                 if skill_rate > 0:
                     skill_msg = f',且对 {player.position} 角色的熟练度提高了！'
                 else:
@@ -1491,11 +1533,13 @@ async def select_role(bot, ev: GroupMessageEvent):
         scrimmage.is_selected.append(characterid)
         player = scrimmage.getPlayerObj(uid)
         player.initData(characterid, scrimmage)
-        skilllevel = get_skill_level(uid, player.position, SKILL_DICT_ALL)
+        skilllevel = get_skill_level(uid, player.position, load_skill_data())
         if skilllevel == SKILL_RATE_NEW:
-            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},没有获得任何熟练度奖励。继续努力吧！', at_sender=True)
+            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},没有获得任何熟练度奖励。继续努力吧！',
+                                 at_sender=True)
         else:
-            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},发送"熟练度奖励"来查询你获得的熟练度奖励', at_sender=True)
+            await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},发送"熟练度奖励"来查询你获得的熟练度奖励',
+                                 at_sender=True)
 
         img = player.role_icon
         img.save(image)
@@ -1507,35 +1551,6 @@ async def select_role(bot, ev: GroupMessageEvent):
             await bot.send(ev, "所有人都选择了角色，大乱斗即将开始！\n碾碎他们")
             await asyncio.sleep(PROCESS_WAIT_TIME)
             scrimmage.now_statu = NOW_STATU_OPEN
-
-@skillbonus.handle()
-async def bonus(bot, ev: GroupMessageEvent):
-    gid, uid = ev.group_id, ev.user_id
-    scrimmage = mgr.get_game(gid)
-
-    if not scrimmage or not scrimmage.now_statu in (NOW_STATU_OPEN,NOW_STATU_SELECT_ROLE):
-        return
-    if uid not in scrimmage.player_list:
-        await skillbonus.finish('你还没有选择任何角色', at_sender=True)
-
-    player = scrimmage.getPlayerObj(uid)
-    skilllevel = get_skill_level(uid, player.position, SKILL_DICT_ALL)
-    if skilllevel == SKILL_RATE_NEW:
-        await skillbonus.finish('你当前没有获得任何熟练度奖励。继续努力吧！')
-    bonus_dict = get_skill_bonus(uid, player.position, SKILL_DICT_ALL)
-    msg = '你的熟练度奖励如下：'
-    for k, v in bonus_dict.items():
-        if k == "defend":
-            msg += f'\n防御力+{v}'
-        if k == "health":
-            msg += f'\n生命值+{v}'
-        if k == "attack":
-            msg += f'\n攻击力+{v}'
-        if k == "distance":
-            msg += f'\n攻击距离+{v}'
-        if k == "tp":
-            msg += f'\n初始tp值+{v}'
-    await skillbonus.finish(msg, at_sender=True)
 
 
 @dice.handle()
@@ -1611,7 +1626,11 @@ async def use_skill(bot, ev: GroupMessageEvent):
     if ret == RET_ERROR:
         return
 
-    scrimmage.turnChange()  # 回合切换
+    # 回合切换
+    result = scrimmage.turnChange()
+    if result != 0:
+        await skill.send(message_builder.at(result) + "已经复活！")
+
     scrimmage.refreshNowImageStatu()  # 刷新当前显示状态
 
     image = IMAGE_PATH / f'{gid}.png'
@@ -1682,6 +1701,7 @@ async def check_role(bot, ev: GroupMessageEvent, arg: Message = CommandArg()):
             f"攻击力：{role_info['attack']}",
             f"防御力：{role_info['defensive']}",
             f"暴击率：{role_info['crit'] > MAX_CRIT and MAX_CRIT or role_info['crit']}%",
+            f"被动技能：{role_info['passive_text'] if role_info.get('passive_text', -1) != -1 else '无'}",
             f"技能：(若有双技能组则以斜线分隔)",
         ]
         skill_num = 1

@@ -25,6 +25,7 @@ class BuffEffectType(IntEnum):
     Attr = 1  # 属性变化型buff，属性的升降
     Shield = 2  # 护盾，配合 BuffTriggerType.Hurt 使用，数值为护盾值
     Blind = 3  # 致盲，配合 BuffTriggerType.Attack 使用，攻击不会造成伤害，不需要数值
+    Prop = 4 # 对角色对象自身属性的变动
 
 
 # buff类型
@@ -59,6 +60,9 @@ class BuffType(IntEnum):
     NormalSelfAttrAtkDown = 40101
     NormalSelfAttrAtkUp = 40102
     NormalSelfAttrCritUp = 40103
+    NormalSelfAttrDefUp = 40104
+    NormalSelfAttrSpeedUp = 40105
+
 
     TurnSelfAttrCritUp = 50101
     TurnSelfAttrAtkUp = 50102
@@ -68,8 +72,16 @@ class BuffType(IntEnum):
     AttackAttrCritHurtUp = 60102
     Blind = 60301
 
+    Sweetie = 77777
+
 
 Buff = {
+    BuffType.Sweetie: {
+      'name': '然然直播中',
+      'text': '嘉然开始直播了！接下来每一个自我回合获得{0}个嘉心糖，持续{1}个回合',
+      'trigger_type': BuffTriggerType.TurnSelf,
+      'effect_type': BuffEffectType.Prop,
+    },
     BuffType.TenRouHaDanKen: {
         'name': '天楼霸断剑',
         'text': '矛依未拔出了她的大剑，改变技能组并提升{0}点攻击距离，持续全场',
@@ -245,6 +257,22 @@ Buff = {
         'effect_type': BuffEffectType.Attr,
 
         'attr_type': Attr.ATTACK,
+    },
+    BuffType.NormalSelfAttrDefUp: {
+        'name': '白月光',
+        'text': '增加{0}防御力，持续{1}个自我回合',
+        'trigger_type': BuffTriggerType.NormalSelf,
+        'effect_type': BuffEffectType.Attr,
+
+        'attr_type': Attr.DEFENSIVE,
+    },
+    BuffType.NormalSelfAttrSpeedUp: {
+        'name': '快速',
+        'text': '增加{0}攻击速度，持续{1}个自我回合',
+        'trigger_type': BuffTriggerType.NormalSelf,
+        'effect_type': BuffEffectType.Attr,
+
+        'attr_type': Attr.ATTACK_SPEED,
     },
     BuffType.NormalSelfAttrCritUp: {
         'name': '精准',

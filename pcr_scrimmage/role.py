@@ -85,6 +85,13 @@ EFFECT_REBORN = "reborn"
 EFFECT_TP_LOCKTURN = "tp_lockturn"
 EFFECT_OUT_TP = "make_it_out_tp"  # 令目标出局时tp变动		number
 EFFECT_OUT_LOCKTURN = "make_it_out_turn"  # 令目标出局时锁定回合	number	锁定回合：不会切换到下一个玩家，当前玩家继续丢色子和放技能
+EFFECT_TP_REQUEST = "tp_request"
+EFFECT_COST_TP = "cost_tp"
+EFFECT_RANDOM = "random"
+EFFECT_SWEETBUFF = "sweetbuff"
+EFFECT_GET_SWEETIE = "get_sweetie"
+EFFECT_CAT_POISION = "cat_poision"
+EFFECT_SWEET_LOCKTURN = "sweet_lockturn"
 
 EFFECT_DIZZINESS = "dizziness"  # 眩晕效果，跳过特定玩家一回合 number
 
@@ -103,6 +110,9 @@ POSITION_SPECIAL = "特殊型" # 特殊，拥有独特技能效果的定位
 
 # 被动技能列表
 PASSIVE_REBORN = "reborn"
+PASSIVE_HEALTHTP = "healthtp"
+PASSIVE_SWEETIE = "sweetie"
+PASSIVE_ATTACKSPEED = "attackspeed"
 
 from .attr import Attr
 from .buff import BuffType
@@ -2390,7 +2400,6 @@ ROLE = {
                 "effect": {
                     EFFECT_ATTR_CHANGE: [
                         (Attr.MAX_HEALTH, 200, 0, 0),
-                        (Attr.NOW_HEALTH, 100, 0, 0),
                         (Attr.ATTACK, -80, 0, 0),
                         (Attr.DEFENSIVE, 35, 0, 0)
                     ],
@@ -2431,7 +2440,7 @@ ROLE = {
         "name": "源樱",
         "position": POSITION_SPECIAL,
         "passive": PASSIVE_REBORN,
-        "passive_text": "被击倒时只会暂时出局，并在3回合后复活，每次复活时获得80点攻击力与15%暴击率",
+        "passive_text": "被击倒时只会暂时出局，并在3自我回合后复活，每次复活时,血量上限增加350点，防御力增加50点，获得80点攻击力与15%暴击率",
 
         "health": 500,
         "distance": 6,
@@ -2478,6 +2487,134 @@ ROLE = {
             },
         ],
         "passive_skills": [
+        ]
+    },
+    5104: {
+        "name": "胡图图",
+        "position": POSITION_SPECIAL,
+        "passive": PASSIVE_HEALTHTP,
+        "passive_text": "图图的技能不消耗tp，而是改为消耗等量的生命值",
+
+        "health": 2500,
+        "distance": 6,
+        "attack": 0,
+        "defensive": 150,
+        "crit": 20,
+        "tp": 0,
+
+        "active_skills": [
+            {
+                "name": "普通攻击",
+                "text": "对目标造成0(+0.6自身已损失生命值)伤害，并将伤害的30%转化为生命值",
+                "tp_cost": 50,
+                "trigger": TRIGGER_SELECT_EXCEPT_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_HURT: (0, Attr.COST_HEALTH, 0, 0.6, False),
+                    EFFECT_LIFESTEAL: 0.3
+                }
+            },
+            {
+                "name": "翻斗花园小霸王",
+                "text": "从以下六种效果中随机选择一种：恢复500点生命值；暴击率提升15%；tp值增加10点；防御力提升50点；生命值降低150点；防御力降低30点。如果已经使用过技能3，则改为随机选择两次",
+                "tp_cost": 250,
+                "trigger": TRIGGER_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_RANDOM: 1,
+                }
+            },
+            {
+                "name": "俺滴图图啊！",
+                "text": "(该技能需要tp值为100时才能使用)最大生命值降低1000，在本局大乱斗中，图图受到攻击时不再扣除生命值，而改为扣除伤害0.1倍的等量tp值；当tp值归0时，图图出局",
+                "tp_cost": 1000,
+                "trigger": TRIGGER_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_TP_REQUEST: 100,
+                    EFFECT_ATTR_CHANGE: [(Attr.MAX_HEALTH, -1000, 0, 0)],
+                    EFFECT_COST_TP: 1
+                }
+            },
+        ],
+        "passive_skills": [
+        ]
+    },
+    5105: {
+        "name": "嘉然",
+        "position": POSITION_SPECIAL,
+        "passive": PASSIVE_SWEETIE,
+        "passive_text": "嘉然拥有嘉心糖的支持(最多10个)，游戏开始时获得3个；每一个嘉心糖可以为嘉然提供150点生命值上限，30点攻击力，30点防御力，以及5%的暴击率。嘉然的嘉心糖数量与生命值上限相关，嘉然每失去150点生命值，就会失去一个嘉心糖",
+
+        "health": 500,
+        "distance": 6,
+        "attack": 10,
+        "defensive": 10,
+        "crit": 0,
+        "tp": 0,
+
+        "active_skills": [
+            {
+                "name": "普通攻击",
+                "text": "对目标造成0(+1.0自身攻击力)伤害，每有一名嘉心糖，此伤害提升8%；并将伤害的15%转化为生命值",
+                "tp_cost": 10,
+                "trigger": TRIGGER_SELECT,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_HURT: (0, Attr.ATTACK, 0, 1.0, False),
+                    EFFECT_LIFESTEAL: 0.15,
+                    EFFECT_SWEETBUFF: 1.08,
+                }
+            },
+            {
+                "name": "开播",
+                "text": "嘉然立即获得2个嘉心糖，并在接下来的2个自我回合内每回合获得1个嘉心糖",
+                "tp_cost": 25,
+                "trigger": TRIGGER_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_GET_SWEETIE: 2,
+                    EFFECT_BUFF:[(BuffType.Sweetie, 1, 2)]
+                }
+            },
+            {
+                "name": "顿顿解馋",
+                "text": "嘉然攻击某个目标，对其造成100(+1.5自身攻击力)伤害，并使其获得猫中毒状态，持续3个自我回合(不可叠加)；在猫中毒状态下的角色每当受到攻击伤害时，嘉然都将获得1个嘉心糖并从该玩家处抢夺10点tp",
+                "tp_cost": 40,
+                "trigger": TRIGGER_SELECT_EXCEPT_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_HURT: (100, Attr.ATTACK, 0, 1.5, False),
+                    EFFECT_CAT_POISION: 3
+                }
+            },
+            {
+                "name": "番茄炒蛋拳！",
+                "text": "嘉然用尽全身力气挥出著名的番茄炒蛋拳，对目标造成250(+0.5自身攻击力)伤害，并消耗全部的嘉心糖，每消耗1个，此伤害提升20%(嘉然的面板按消耗前结算)；如果消耗了5个或更多嘉心糖，则嘉然锁定1个回合",
+                "tp_cost": 90,
+                "trigger": TRIGGER_ME,
+                "passive": [0],
+
+                "effect": {
+                    EFFECT_SWEET_LOCKTURN: 5
+
+                }
+            },
+        ],
+        "passive_skills": [
+            {
+                "trigger": TRIGGER_SELECT_EXCEPT_ME,
+                "effect": {
+                    EFFECT_HURT: (300, Attr.ATTACK, 0, 0.5, False),
+                    EFFECT_SWEETBUFF: 1.2
+                }
+            }
         ]
     },
 }

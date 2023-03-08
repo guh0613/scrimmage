@@ -51,14 +51,43 @@ from .role import (EFFECT_BUFF, EFFECT_BUFF_BY_BT, EFFECT_DIZZINESS, EFFECT_HIT_
                    TRIGGER_ME, TRIGGER_ALL_EXCEPT_ME, TRIGGER_ALL, TRIGGER_SELECT, TRIGGER_SELECT_EXCEPT_ME,
                    TRIGGER_NEAR, EFFECT_DEL_BUFF, EFFECT_TP_LOCKTURN, POSITION_DEFEND, POSITION_SPECIAL, POSITION_BURST,
                    POSITION_ATTACK
-, PASSIVE_REBORN, EFFECT_REBORN, EFFECT_REVENGE, EFFECT_KILL_REBORN)
-__zx_plugin_name__ = "大乱斗(测试服)"
+, PASSIVE_REBORN, EFFECT_REBORN, EFFECT_REVENGE, EFFECT_KILL_REBORN, PASSIVE_HEALTHTP, EFFECT_TP_REQUEST,
+                   EFFECT_COST_TP, EFFECT_RANDOM, PASSIVE_SWEETIE, EFFECT_SWEETBUFF, EFFECT_GET_SWEETIE,
+                   EFFECT_CAT_POISION, EFFECT_SWEET_LOCKTURN, PASSIVE_ATTACKSPEED)
+
+__zx_plugin_name__ = "大乱斗"
 __plugin_usage__ = """
 usage：
-    大乱斗测试服，用于游戏测试和新内容体验。使用"创建内测大乱斗/加入内测大乱斗/开始内测大乱斗"进行一局游戏。
+    基础命令：
+	1、大乱斗规则
+	可查看大乱斗相关规则
+	2、大乱斗角色
+	可查看所有可用角色
+	3、角色详情 （角色名）
+	如：角色详情 黑猫
+	可查看角色的基础属性和技能
+	4、结束大乱斗
+	可以强制结束正在进行的大乱斗游戏
+	（该命令只有管理员和房主可用）
+一、创建阶段：
+	1、创建大乱斗
+	2、加入大乱斗
+	3、开始大乱斗
+二、选择角色阶段：
+	1、（角色名）
+	如：凯露 / 黑猫
+	（名字和外号都行）
+三、对战阶段：
+	1、丢色子
+	2、（技能编号） @xxx
+	如：1 @xxx
+	发送技能编号并@目标，如果这个技能不需要指定目标，直接发送技能编号即可
+	3、查看属性
+	可查看自己当前角色详细属性
+	4、投降 / 认输
 """.strip()
-__plugin_des__ = "大乱斗测试服"
-__plugin_cmd__ = ["创建内测大乱斗"]
+__plugin_des__ = "进行一场激动人心的大乱斗"
+__plugin_cmd__ = ["大乱斗规则/创建大乱斗"]
 __plugin_type__ = ("群内小游戏",)
 __plugin_version__ = 1.0
 __plugin_author__ = "egggi"
@@ -66,7 +95,7 @@ __plugin_settings__ = {
     "level": 5,  # 群权限等级，请不要设置为1或999，若无特殊情况请设置为5
     "default_status": True,  # 进群时的默认开关状态
     "limit_superuser": False,  # 开关插件的限制是否限制超级用户
-    "cmd": ['内测大乱斗'],  # 命令别名，主要用于帮助和开关
+    "cmd": ['大乱斗'],  # 命令别名，主要用于帮助和开关
 }
 
 info = on_command("角色详情", priority=5, block=True)
@@ -81,6 +110,7 @@ selectcha = on_message(priority=999, block=True)
 start = on_fullmatch("开始大乱斗", priority=5, block=True)
 join = on_fullmatch("加入大乱斗", priority=5, block=True)
 create = on_fullmatch("创建大乱斗", priority=5, block=True)
+skillbonus = on_fullmatch("熟练度奖励", priority=5, block=True)
 
 FILE_PATH = os.path.dirname(__file__)
 
@@ -129,7 +159,7 @@ def hurt_defensive_calculate(hurt, defensive):
         percent = defensive * 0.0015
     else:
         if defensive <= 1000:
-            percent = 100 * 0.0012 + (defensive - 100) * 0.0005
+            percent = 100 * 0.0015 + (defensive - 100) * 0.0005
         else:
             percent = 100 * 0.0012 + 900 * 0.0005
     return hurt - hurt * percent
@@ -186,7 +216,7 @@ class Role:
     def __init__(self, user_id) -> None:
         self.user_id = user_id  # 玩家的qq号
 
-        self.role_id = 0  # pcr角色编号
+        self.role_id = 0  # 角色编号
         self.name = ''  # 角色名
         self.role_icon = None  # 角色头像
         self.player_num = 0  # 玩家在这个房间的编号
@@ -216,6 +246,10 @@ class Role:
         self.skip_turn = 0  # 跳过x回合
         self.reborn_turn = 3 # 复活所需回合数
         self.revenge = 0 # 复仇对象
+        self.costtp = 0
+        self.sweetie = 0 # 嘉心糖数量
+        self.lastsweetie = -1
+        self.catpoison = 0
 
         self.passive = ''
         self.active_skills = []  # 技能列表
@@ -225,6 +259,8 @@ class Role:
     def initData(self, role_id, room_obj):
         image = IMAGE_PATH / "chara" / f"{role_id}31.png"
         role_data = ROLE[role_id]
+
+
         if role_data:
             self.role_id = role_id
 
@@ -246,10 +282,14 @@ class Role:
             self.attr[Attr.COST_HEALTH] = 0
 
             self.passive = role_data['passive'] if role_data.get('passive', -1) != -1 else ''
+            # 游戏开始时先计算一次嘉然的属性
+            if self.passive == PASSIVE_SWEETIE:
+                self.sweetie = 3
+                self.sweetiecalculate(True)
             self.active_skills = role_data['active_skills']
             self.passive_skills = role_data['passive_skills']
-        skill_dict = load_skill_data()
-        bonus_dict = get_skill_bonus(self.user_id, self.position, skill_dict)
+
+        bonus_dict = get_skill_bonus(self.user_id, self.position, load_skill_data())
         for k,v in bonus_dict.items():
             if k == "defend":
                 self.attr[Attr.DEFENSIVE] += v
@@ -276,6 +316,9 @@ class Role:
         self.attr[attr_type] += num
 
         # 属性数值改变后的处理
+        if attr_type == Attr.NOW_HEALTH and num < 0 and self.passive == PASSIVE_SWEETIE:
+            # 重新计算嘉然的属性
+            self.sweetiecalculate()
         if attr_type == Attr.MAX_HEALTH and num > 0:
             # 如果增加的是生命最大值，则当前生命也增加同等数值
             self.attr[Attr.NOW_HEALTH] += num
@@ -301,14 +344,22 @@ class Role:
         if attr_type == Attr.NOW_HEALTH:
             self.attr[Attr.COST_HEALTH] = self.attr[Attr.MAX_HEALTH] - self.attr[Attr.NOW_HEALTH]
 
+
+
         if self.attr[attr_type] <= 0:
             self.attr[attr_type] = 0
-            if attr_type == Attr.NOW_HEALTH:
-                if self.passive == PASSIVE_REBORN:
-                    self.room_obj.outDispose(self, True, self.reborn_turn)
-                else:
-                    # 如果是生命值降为0，则调用出局接口
+            if self.costtp == 1:
+                if attr_type == Attr.NOW_TP:
                     self.room_obj.outDispose(self)
+                elif attr_type == Attr.NOW_HEALTH:
+                    self.room_obj.outDispose(self)
+            else:
+                if attr_type == Attr.NOW_HEALTH:
+                    if self.passive == PASSIVE_REBORN:
+                        self.room_obj.outDispose(self, True, self.reborn_turn)
+                    else:
+                        # 如果是生命值降为0，则调用出局接口
+                        self.room_obj.outDispose(self)
         return self.attr[attr_type]
 
     # 位置改变	flag:如果为真，则直接设置固定位置；如果为假，根据原位置改变
@@ -336,8 +387,13 @@ class Role:
 
     # 被攻击
     def beHurt(self, num):
-        num = self.buffTriggerByTriggerType(BuffTriggerType.Hurt, num)
-        self.attrChange(Attr.NOW_HEALTH, num)
+        if self.costtp == 1:
+            num = self.buffTriggerByTriggerType(BuffTriggerType.Hurt, num)
+            num = math.floor(num * 0.1)
+            self.attrChange(Attr.NOW_TP, num)
+        else:
+            num = self.buffTriggerByTriggerType(BuffTriggerType.Hurt, num)
+            self.attrChange(Attr.NOW_HEALTH, num)
         return num
 
     # 添加buff
@@ -401,6 +457,9 @@ class Role:
             if num > 0: num = 0
         elif effect_type == BuffEffectType.Blind:
             num = 0
+        elif effect_type == BuffEffectType.Prop:
+            self.sweetie += self.buff[buff_type][0]
+            self.sweetiecalculate(True)
 
         self.buff[buff_type][1] -= 1
 
@@ -420,6 +479,10 @@ class Role:
             f"暴击伤害：{self.attr[Attr.CRIT_HURT]}倍",
             f'位置：{self.now_location}'
         ]
+        if self.passive == PASSIVE_SWEETIE:
+            msg.append(f'嘉心糖数量：{self.sweetie}')
+        if self.passive == PASSIVE_ATTACKSPEED:
+            msg.append(f'攻击速度：{self.attr[Attr.ATTACK_SPEED]}')
         if len(self.buff) != 0:
             msg.append('\nbuff效果列表:')
             for buff_type, buff_info in self.buff.items():
@@ -428,6 +491,42 @@ class Role:
                         buff_info[1] > 10000 and "无限" or buff_info[1]))
                 msg.append(f'{Buff[buff_type]["name"]}:{buff_text}')
         return msg
+
+    # 计算嘉然的属性
+    def sweetiecalculate(self, isnothurt=False):
+        role_data = ROLE[self.role_id]
+        if isnothurt:
+            pass
+        else:
+            sweetienum = math.ceil((self.attr[Attr.NOW_HEALTH] - role_data['health']) / 150)
+            self.sweetie = sweetienum if sweetienum >= 0 else 0
+        if self.sweetie > 10:
+            self.sweetie = 10
+        maxhealth = role_data['health'] + (150 * self.sweetie)
+        num = maxhealth - self.attr[Attr.MAX_HEALTH]
+        # 如果是正收益，则生命值一起增加
+        if num > 0:
+            self.attr[Attr.MAX_HEALTH] = maxhealth
+            self.attr[Attr.NOW_HEALTH] += num
+        else:
+            self.attr[Attr.MAX_HEALTH] = maxhealth
+        if self.lastsweetie == -1:
+            attack = (30 * self.sweetie)
+            self.attr[Attr.ATTACK] = role_data['attack'] + attack
+            self.attr[Attr.DEFENSIVE] = role_data['defensive'] + (30 * self.sweetie)
+            self.attr[Attr.CRIT] = role_data['crit'] + (5 * self.sweetie)
+            if self.attr[Attr.CRIT] > MAX_CRIT:
+                self.attr[Attr.CRIT] = MAX_CRIT
+            self.lastsweetie = self.sweetie
+        else:
+            num = self.sweetie - self.lastsweetie
+            if num != 0:
+                self.attrChange(Attr.ATTACK, (30*num))
+                self.attrChange(Attr.DEFENSIVE, (30*num))
+                self.attrChange(Attr.CRIT, (5*num))
+                self.lastsweetie = self.sweetie
+
+
 
 
 # 公主连结大乱斗
@@ -582,13 +681,16 @@ class PCRScrimmage:
             if self.now_turn >= len(self.player_list):
                 self.now_turn = 0
             next_turn_player = self.getNowTurnPlayerObj()  # 下一个玩家
+
             if next_turn_player.skip_turn > 0:  # 跳过被眩晕的玩家
                 next_turn_player.skip_turn -= 1
                 if next_turn_player.skip_turn == 0 and next_turn_player.now_stage == NOW_STAGE_FAKEOUT:
                     next_turn_player.stageChange(NOW_STAGE_WAIT)
+                    next_turn_player.attr[Attr.MAX_HEALTH] += 350
+                    next_turn_player.attr[Attr.DEFENSIVE] += 50
                     next_turn_player.attr[Attr.NOW_HEALTH] = next_turn_player.attr[Attr.MAX_HEALTH]
                     next_turn_player.attr[Attr.ATTACK] += 80
-                    next_turn_player.attr[Attr.CRIT] += 15
+                    next_turn_player.attrChange(Attr.CRIT, 15)
                     key = getkey(self.rank, next_turn_player.user_id)
                     self.rank.pop(key)
                     temp = {}
@@ -643,6 +745,8 @@ class PCRScrimmage:
             iter_player.buffTriggerByTriggerType(BuffTriggerType.Normal)
             iter_player.buffTriggerByTriggerType(BuffTriggerType.Turn)
             if iter_player_id == player_id:
+                if player.catpoison > 0:
+                    player.catpoison -= 1
                 player.buffTriggerByTriggerType(BuffTriggerType.NormalSelf)
                 player.buffTriggerByTriggerType(BuffTriggerType.TurnSelf)
 
@@ -658,6 +762,7 @@ class PCRScrimmage:
             await bot.send(ev, message_builder.at(player.user_id) + f'暂时出局并将在{player.reborn_turn}回合后复活！')
             self.turnChange()  # 回合切换
             self.refreshNowImageStatu()  # 刷新当前显示状态
+
         if player.now_stage == NOW_STAGE_OUT:
             await bot.send(ev, message_builder.at(player.user_id) + '出局')
             self.turnChange()  # 回合切换
@@ -790,12 +895,12 @@ class PCRScrimmage:
             real_skill_id = skill_id - 1  # 实际技能id
             skill = use_player_obj.active_skills[real_skill_id]
             skill_tp_cost = skill["tp_cost"]  # tp消耗
-            if skill_tp_cost > use_player_obj.attr[Attr.NOW_TP]:  # 检查tp是否足够
-                await bot.send(ev, 'tp不足，无法使用这个技能')
+            if skill_tp_cost > use_player_obj.attr[Attr.NOW_TP if use_player_obj.passive!=PASSIVE_HEALTHTP else Attr.NOW_HEALTH]:  # 检查tp是否足够
+                await bot.send(ev, 'tp不足，无法使用这个技能' if use_player_obj.passive!=PASSIVE_HEALTHTP else '生命值不足，无法使用这个技能')
                 return RET_ERROR
 
             # 先扣除tp
-            use_player_obj.attrChange(Attr.NOW_TP, -skill_tp_cost)
+            use_player_obj.attrChange(Attr.NOW_TP if use_player_obj.passive!=PASSIVE_HEALTHTP else Attr.NOW_HEALTH, -skill_tp_cost)
 
             use_player_name = uid2card(use_player_obj.user_id, self.user_card_dict)
             use_skill_nale = use_player_obj.active_skills[real_skill_id]["name"]
@@ -806,7 +911,7 @@ class PCRScrimmage:
             if ret == RET_ERROR:
                 await bot.send(ev, Message(msg))
                 # 技能释放失败，返还tp
-                use_player_obj.attrChange(Attr.NOW_TP, skill_tp_cost)
+                use_player_obj.attrChange(Attr.NOW_TP if use_player_obj.passive!=PASSIVE_HEALTHTP else Attr.NOW_HEALTH, skill_tp_cost)
                 return ret
             await bot.send(ev, Message('\n'.join(back_msg)))
 
@@ -905,6 +1010,10 @@ class PCRScrimmage:
         use_player_name = uid2card(use_skill_player.user_id, self.user_card_dict)
         goal_player_name = uid2card(goal_player.user_id, self.user_card_dict)
 
+        if EFFECT_TP_REQUEST in skill_effect:
+            if use_skill_player.attr[Attr.NOW_TP] < skill_effect[EFFECT_TP_REQUEST]:
+                return RET_ERROR, '未满足技能释放要求'
+
         # aoe效果
         if EFFECT_AOE in skill_effect:
             aoe_dist = skill_effect[EFFECT_AOE][0]  # aoe范围
@@ -983,6 +1092,14 @@ class PCRScrimmage:
                 back_msg.append(f'{goal_player_name}前进了{num}步')
                 back_msg = self.skillcaseTrigger(goal_player, back_msg)
 
+        # 获得嘉心糖效果
+        if EFFECT_GET_SWEETIE in skill_effect:
+            num = skill_effect[EFFECT_GET_SWEETIE]
+            use_skill_player.sweetie += num
+            use_skill_player.sweetiecalculate(True)
+            back_msg.append(f'{use_player_name}获得了{num}个嘉心糖')
+
+
         # buff效果
         if EFFECT_BUFF in skill_effect:
             for buff_info in skill_effect[EFFECT_BUFF]:
@@ -1031,7 +1148,20 @@ class PCRScrimmage:
         if EFFECT_HURT in skill_effect:
             num, crit_flag = self.hurtCalculate(skill_effect, use_skill_player, goal_player, back_msg)
             num = goal_player.beHurt(num)
-            back_msg.append(f'{crit_flag and "暴击！" or ""}{goal_player_name}受到了{abs(num)}点伤害')
+            if goal_player.costtp == 1:
+                back_msg.append(f'{crit_flag and "暴击！" or ""}{goal_player_name}的tp值降低了{abs(num)}点')
+            else:
+                back_msg.append(f'{crit_flag and "暴击！" or ""}{goal_player_name}受到了{abs(num)}点伤害')
+
+            if num < 0 < goal_player.catpoison:
+                diana_player = self.getDianaObj()
+                diana_player.sweetie += 1
+                diana_player.sweetiecalculate(True)
+                goal_player.attrChange(Attr.NOW_TP, -10)
+                diana_player.attrChange(Attr.NOW_TP, 10)
+                diana_player_name = uid2card(diana_player.user_id, self.user_card_dict)
+                back_msg.append(f'由于{goal_player_name}正处于猫中毒状态，{diana_player_name}获得了1个嘉心糖并从该玩家处抢夺了10点tp')
+
             if goal_player.now_stage == NOW_STAGE_OUT:
                 use_skill_player.attrChange(Attr.NOW_TP, HIT_DOWN_TP)  # 击倒回复tp
                 back_msg.append(f'{message_builder.at(goal_player.user_id)}出局')
@@ -1040,12 +1170,59 @@ class PCRScrimmage:
                 goal_player.revenge = use_skill_player.user_id
                 back_msg.append(f'{message_builder.at(goal_player.user_id)}暂时出局并将在{goal_player.reborn_turn}回合后复活！')
 
+        # 猫中毒效果
+        if EFFECT_CAT_POISION in skill_effect:
+            num = skill_effect[EFFECT_CAT_POISION]
+            goal_player.catpoison = num
+            back_msg.append(f'{goal_player_name}进入了猫中毒状态，持续{num}个自我回合')
+
+        # 消耗嘉心糖锁定回合效果
+        if EFFECT_SWEET_LOCKTURN in skill_effect:
+            num = use_skill_player.sweetie
+            use_skill_player.sweetie = 0
+            use_skill_player.sweetiecalculate(True)
+            back_msg.append(f'{use_player_name}消耗了{num}个嘉心糖')
+            lockrequirement = skill_effect[EFFECT_SWEET_LOCKTURN]
+            if num >= lockrequirement:
+                self.lock_turn = 1
+                back_msg.append(f'由于消耗数量达到了{lockrequirement}个或更多，{use_player_name}锁定了一回合')
+
+
         # tp达到指定值时锁定回合
         if EFFECT_TP_LOCKTURN in skill_effect:
             num1 = skill_effect[EFFECT_TP_LOCKTURN]
             if use_skill_player.attr[Attr.NOW_TP] >= num1:
                 self.lock_turn = 1
                 back_msg.append(f'{use_player_name}锁定了1回合')
+
+        if EFFECT_COST_TP in skill_effect:
+            use_skill_player.costtp = 1
+            back_msg.append(f'{use_player_name}接下来受到攻击时改为降低tp值！')
+
+        if EFFECT_RANDOM in skill_effect:
+            if use_skill_player.costtp != 1:
+                choice = [random.choice(range(1,7))]
+            else:
+                choice = [random.choice(range(1,7)),random.choice(range(1,7))]
+            for choose in choice:
+                if choose == 1:
+                    use_skill_player.attrChange(Attr.NOW_HEALTH, 500)
+                    back_msg.append(f'{use_player_name}增加了500点生命值')
+                if choose == 2:
+                    use_skill_player.attrChange(Attr.CRIT, 15)
+                    back_msg.append(f'{use_player_name}增加了15%暴击率')
+                if choose == 3:
+                    use_skill_player.attrChange(Attr.NOW_TP, 10)
+                    back_msg.append(f'{use_player_name}增加了10点tp')
+                if choose == 4:
+                    use_skill_player.attrChange(Attr.DEFENSIVE, 50)
+                    back_msg.append(f'{use_player_name}增加了50点防御力')
+                if choose == 5:
+                    use_skill_player.attrChange(Attr.NOW_HEALTH, -150)
+                    back_msg.append(f'{use_player_name}减少了150点生命值')
+                if choose == 6:
+                    use_skill_player.attrChange(Attr.DEFENSIVE, -50)
+                    back_msg.append(f'{use_player_name}减少了50点防御力')
 
         # 效果击倒tp
         if EFFECT_OUT_TP in skill_effect:
@@ -1124,6 +1301,11 @@ class PCRScrimmage:
             goal_player_def = goal_player.attr[Attr.DEFENSIVE]  # 目标防御力
             num = hurt_defensive_calculate(num, goal_player_def)  # 计算目标防御力后的数值
 
+        # 嘉心糖增伤效果
+        if EFFECT_SWEETBUFF in skill_effect:
+            sweet_prop = skill_effect[EFFECT_SWEETBUFF]
+            num = num * (sweet_prop ** use_skill_player.sweetie) # 每有一个嘉心糖增伤
+
         # 斩杀效果
         if EFFECT_ELIMINATE in skill_effect:
             # cons_prop：目标已消耗的生命值比例; real_prop：真正的伤害比例
@@ -1162,10 +1344,16 @@ class PCRScrimmage:
             msg.append(f'{message_builder.at(player.user_id)}的放技能阶段：\n(发送技能编号，如需选择目标则@目标)')
             skill_list = player.active_skills
             skill_num = 0
-            for skill in skill_list:
-                tp_cost = skill["tp_cost"]
-                msg.append(f'  技能{skill_num + 1}:{skill["name"]}({tp_cost}TP):\n   {skill["text"]}\n')
-                skill_num += 1
+            if player.passive == PASSIVE_HEALTHTP:
+                for skill in skill_list:
+                    tp_cost = skill["tp_cost"]
+                    msg.append(f'  技能{skill_num + 1}:{skill["name"]}({tp_cost}生命值):\n   {skill["text"]}\n')
+                    skill_num += 1
+            else:
+                for skill in skill_list:
+                    tp_cost = skill["tp_cost"]
+                    msg.append(f'  技能{skill_num + 1}:{skill["name"]}({tp_cost}TP):\n   {skill["text"]}\n')
+                    skill_num += 1
             msg.append('(发送"跳过"跳过出技能阶段)')
             await bot.send(ev, Message("\n".join(msg)))
 
@@ -1185,6 +1373,15 @@ class PCRScrimmage:
     def getPlayerObj(self, player_id):
         player: Role = self.player_list[player_id]
         return player
+
+    # 找到嘉然玩家
+    def getDianaObj(self):
+        for player_id in self.player_list:
+            player = self.getPlayerObj(player_id)
+            if player.passive == PASSIVE_SWEETIE:
+                return player
+            else:
+                return None
 
     # 获取当前回合的玩家对象
     def getNowTurnPlayerObj(self):
@@ -1533,7 +1730,8 @@ async def select_role(bot, ev: GroupMessageEvent):
         scrimmage.is_selected.append(characterid)
         player = scrimmage.getPlayerObj(uid)
         player.initData(characterid, scrimmage)
-        skilllevel = get_skill_level(uid, player.position, load_skill_data())
+        skill_dict = load_skill_data()
+        skilllevel = get_skill_level(uid, player.position, skill_dict)
         if skilllevel == SKILL_RATE_NEW:
             await selectcha.send(f'你在当前定位的熟练度为：{skilllevel},没有获得任何熟练度奖励。继续努力吧！',
                                  at_sender=True)
@@ -1551,6 +1749,36 @@ async def select_role(bot, ev: GroupMessageEvent):
             await bot.send(ev, "所有人都选择了角色，大乱斗即将开始！\n碾碎他们")
             await asyncio.sleep(PROCESS_WAIT_TIME)
             scrimmage.now_statu = NOW_STATU_OPEN
+
+@skillbonus.handle()
+async def bonus(bot, ev: GroupMessageEvent):
+    gid, uid = ev.group_id, ev.user_id
+    scrimmage = mgr.get_game(gid)
+
+    if not scrimmage or not scrimmage.now_statu in (NOW_STATU_OPEN,NOW_STATU_SELECT_ROLE):
+        return
+    if uid not in scrimmage.player_list:
+        await skillbonus.finish('你还没有选择任何角色', at_sender=True)
+
+    player = scrimmage.getPlayerObj(uid)
+    skill_dict = load_skill_data()
+    skilllevel = get_skill_level(uid, player.position, skill_dict)
+    if skilllevel == SKILL_RATE_NEW:
+        await skillbonus.finish('你当前没有获得任何熟练度奖励。继续努力吧！')
+    bonus_dict = get_skill_bonus(uid, player.position, skill_dict)
+    msg = '你的熟练度奖励如下：'
+    for k, v in bonus_dict.items():
+        if k == "defend":
+            msg += f'\n防御力+{v}'
+        if k == "health":
+            msg += f'\n生命值+{v}'
+        if k == "attack":
+            msg += f'\n攻击力+{v}'
+        if k == "distance":
+            msg += f'\n攻击距离+{v}'
+        if k == "tp":
+            msg += f'\n初始tp值+{v}'
+    await skillbonus.finish(msg, at_sender=True)
 
 
 @dice.handle()
@@ -1705,9 +1933,14 @@ async def check_role(bot, ev: GroupMessageEvent, arg: Message = CommandArg()):
             f"技能：(若有双技能组则以斜线分隔)",
         ]
         skill_num = 1
-        for skill in role_info['active_skills']:
-            msg.append(f"  技能{skill_num}：{skill['name']}({skill['tp_cost']}tp)：{skill['text']}")
-            skill_num += 1
+        if role_info['passive'] == PASSIVE_HEALTHTP:
+            for skill in role_info['active_skills']:
+                msg.append(f"  技能{skill_num}：{skill['name']}({skill['tp_cost']}生命值)：{skill['text']}")
+                skill_num += 1
+        else:
+            for skill in role_info['active_skills']:
+                msg.append(f"  技能{skill_num}：{skill['name']}({skill['tp_cost']}tp)：{skill['text']}")
+                skill_num += 1
         return await bot.send(ev, "\n".join(msg))
 
     await bot.send(ev, '不存在的角色')

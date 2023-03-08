@@ -12,6 +12,7 @@ class Attr(IntEnum):
 	CRIT_HURT		= 9		#暴击伤害
 
 
+	ATTACK_SPEED 	= 10	#攻击速度
 	COST_HEALTH		= 1000	#已损失生命值（特殊属性，不能直接变动数值）
 
 def AttrTextChange(attr_type):

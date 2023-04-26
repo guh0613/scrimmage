@@ -72,6 +72,8 @@ def judge_skill_level(data):
 
 def get_skill_level(uid, position: str, skill_dict_all: Dict):
     uid = str(uid)
+    if not uid in skill_dict_all.keys():
+        skill_dict_all[uid] = {"defend": 0, "attack": 0, "burst": 0, "special": 0}
     if position == "all":
         judge = []
         for values in skill_dict_all[uid].values():

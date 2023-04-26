@@ -1933,7 +1933,7 @@ async def check_role(bot, ev: GroupMessageEvent, arg: Message = CommandArg()):
             f"技能：(若有双技能组则以斜线分隔)",
         ]
         skill_num = 1
-        if role_info['passive'] == PASSIVE_HEALTHTP:
+        if role_info.get('passive', -1) == PASSIVE_HEALTHTP:
             for skill in role_info['active_skills']:
                 msg.append(f"  技能{skill_num}：{skill['name']}({skill['tp_cost']}生命值)：{skill['text']}")
                 skill_num += 1

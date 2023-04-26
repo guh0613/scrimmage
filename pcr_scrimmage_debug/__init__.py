@@ -125,19 +125,21 @@ SKILL_RATE_DICT = {
 
 # 防御力计算机制。
 # 100点防御力内，每1点防御力增加0.15%伤害减免；
-# 到达100点防御力后，每一点防御力只可获得0.12%伤害减免；
-# 100点防御力后，每1点防御力增加0.05%伤害减免；
+# 到达100点防御力后，每一点防御力只可获得0.1%伤害减免；
+# 500点防御力后，每1点防御力增加0.05%伤害减免；
 # 最高有效防御力为1000
-# （防御力可无限提升，但最高只能获得57%伤害减免）
+# （防御力可无限提升，但最高只能获得80%伤害减免）
 def hurt_defensive_calculate(hurt, defensive):
     percent = 0.0
     if defensive <= 100:
         percent = defensive * 0.0015
     else:
-        if defensive <= 1000:
-            percent = 100 * 0.0015 + (defensive - 100) * 0.0005
+        if defensive <= 500:
+            percent = 100 * 0.0015 + (defensive - 100) * 0.0010
+        elif 500 < defensive <= 1000:
+            percent = 100 * 0.0015 + 400 * 0.0010 + (defensive - 500) * 0.0005
         else:
-            percent = 100 * 0.0012 + 900 * 0.0005
+            percent = 100 * 0.0015 + 400 * 0.0010 + 500 * 0.0005
     return hurt - hurt * percent
 
 
@@ -1133,7 +1135,7 @@ class PCRScrimmage:
             if EFFECT_ATTACK_BURST in skill_effect:
                 defdown_num = 0 - math.floor(0.2 * goal_player.attr[Attr.DEFENSIVE])
                 goal_player.attrChange(Attr.DEFENSIVE, defdown_num)
-                back_msg.append(f'{goal_player_name}的防御力下降了{defdown_num}点')
+                back_msg.append(f'{goal_player_name}的防御力下降了{abs(defdown_num)}点')
 
             if use_skill_player.passive == PASSIVE_ATTACKSPEED:
                 attackspeed = (use_skill_player.attr[Attr.ATTACK_SPEED] * 2) if  EFFECT_DOUBLESPEED in skill_effect else use_skill_player.attr[Attr.ATTACK_SPEED]
@@ -1142,7 +1144,7 @@ class PCRScrimmage:
                     for i in range(0,attack_num):
                         num2, crit_flag2 = self.hurtCalculate(skill_effect, use_skill_player, goal_player, back_msg)
                         if EFFECT_ATTACK_BURST in skill_effect:
-                            num2 = math.floor(num2 * (1.2 ** (i+1)))
+                            num2 = math.floor(num2 * (1.12 ** (i+1)))
                         num2 = goal_player.beHurt(num2)
                         if goal_player.costtp == 1:
                             back_msg.append(f'{use_player_name}发起第{i+2}次攻击,{crit_flag2 and "暴击！" or ""}{goal_player_name}的tp值降低了{abs(num2)}点')
@@ -1151,7 +1153,7 @@ class PCRScrimmage:
                         if EFFECT_ATTACK_BURST in skill_effect:
                             defdown_num = 0 - math.floor(0.2 * goal_player.attr[Attr.DEFENSIVE])
                             goal_player.attrChange(Attr.DEFENSIVE, defdown_num)
-                            back_msg.append(f'{goal_player_name}的防御力下降了{defdown_num}点')
+                            back_msg.append(f'{goal_player_name}的防御力下降了{abs(defdown_num)}点')
                         if num2 < 0 < goal_player.catpoison:
                             diana_player = self.getDianaObj()
                             diana_player.sweetie += 1
@@ -1995,7 +1997,7 @@ async def check_role(bot, ev: GroupMessageEvent, arg: Message = CommandArg()):
             f"技能：(若有双技能组则以斜线分隔)",
         ]
         skill_num = 1
-        if role_info['passive'] == PASSIVE_HEALTHTP:
+        if role_info.get('passive', -1) == PASSIVE_HEALTHTP:
             for skill in role_info['active_skills']:
                 msg.append(f"  技能{skill_num}：{skill['name']}({skill['tp_cost']}生命值)：{skill['text']}")
                 skill_num += 1

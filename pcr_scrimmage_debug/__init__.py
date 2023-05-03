@@ -44,17 +44,7 @@ from .attr import Attr, AttrTextChange
 from .buff import BuffEffectType, BuffTriggerType, Buff, BuffType
 from .runway_case import (CASE_NONE, CASE_ATTACK, CASE_DEFENSIVE, CASE_HEALTH,
                           CASE_MOVE, CASE_TP, RUNWAY_CASE)
-from .role import (EFFECT_BUFF, EFFECT_BUFF_BY_BT, EFFECT_DIZZINESS, EFFECT_HIT_BACK, EFFECT_JUMP, EFFECT_SKILL_CHANGE,
-                   EFFECT_STAND, ROLE, EFFECT_LOCKTURN,
-                   EFFECT_HURT, EFFECT_ATTR_CHANGE, EFFECT_MOVE, EFFECT_MOVE_GOAL, EFFECT_LIFESTEAL,
-                   EFFECT_OUT_TP, EFFECT_OUT_LOCKTURN, EFFECT_IGNORE_DIST, EFFECT_AOE, EFFECT_ELIMINATE,
-                   TRIGGER_ME, TRIGGER_ALL_EXCEPT_ME, TRIGGER_ALL, TRIGGER_SELECT, TRIGGER_SELECT_EXCEPT_ME,
-                   TRIGGER_NEAR, EFFECT_DEL_BUFF, EFFECT_TP_LOCKTURN, POSITION_DEFEND, POSITION_SPECIAL, POSITION_BURST,
-                   POSITION_ATTACK
-, PASSIVE_REBORN, EFFECT_REBORN, EFFECT_REVENGE, EFFECT_KILL_REBORN, PASSIVE_HEALTHTP, EFFECT_TP_REQUEST,
-                   EFFECT_COST_TP, EFFECT_RANDOM, PASSIVE_SWEETIE, EFFECT_SWEETBUFF, EFFECT_GET_SWEETIE,
-                   EFFECT_CAT_POISION, EFFECT_SWEET_LOCKTURN, PASSIVE_ATTACKSPEED, EFFECT_DOUBLESPEED,
-                   EFFECT_HEALTH_DOWN, EFFECT_ATTACK_BURST)
+from .role import *
 __zx_plugin_name__ = "大乱斗(测试服)"
 __plugin_usage__ = """
 usage：
@@ -125,21 +115,21 @@ SKILL_RATE_DICT = {
 
 # 防御力计算机制。
 # 100点防御力内，每1点防御力增加0.15%伤害减免；
-# 到达100点防御力后，每一点防御力只可获得0.1%伤害减免；
+# 到达100点防御力后，每一点防御力只可获得0.07%伤害减免；
 # 500点防御力后，每1点防御力增加0.05%伤害减免；
 # 最高有效防御力为1000
-# （防御力可无限提升，但最高只能获得80%伤害减免）
+# （防御力可无限提升，但最高只能获得68%伤害减免）
 def hurt_defensive_calculate(hurt, defensive):
     percent = 0.0
     if defensive <= 100:
         percent = defensive * 0.0015
     else:
         if defensive <= 500:
-            percent = 100 * 0.0015 + (defensive - 100) * 0.0010
+            percent = 100 * 0.0015 + (defensive - 100) * 0.0007
         elif 500 < defensive <= 1000:
-            percent = 100 * 0.0015 + 400 * 0.0010 + (defensive - 500) * 0.0005
+            percent = 100 * 0.0015 + 400 * 0.0007 + (defensive - 500) * 0.0005
         else:
-            percent = 100 * 0.0015 + 400 * 0.0010 + 500 * 0.0005
+            percent = 100 * 0.0015 + 400 * 0.0007 + 500 * 0.0005
     return hurt - hurt * percent
 
 
@@ -228,6 +218,8 @@ class Role:
         self.sweetie = 0 # 嘉心糖数量
         self.lastsweetie = -1
         self.catpoison = 0
+        self.has_skipped_turn = 0
+        self.unknown = 0
 
         self.passive = ''
         self.active_skills = []  # 技能列表
@@ -463,6 +455,8 @@ class Role:
             msg.append(f'嘉心糖数量：{self.sweetie}')
         if self.passive == PASSIVE_ATTACKSPEED:
             msg.append(f'攻击速度：{self.attr[Attr.ATTACK_SPEED]}')
+        if self.passive == PASSIVE_SKIP:
+            msg.append(f'已跳过回合数：{self.has_skipped_turn}')
         if len(self.buff) != 0:
             msg.append('\nbuff效果列表:')
             for buff_type, buff_info in self.buff.items():
@@ -721,7 +715,10 @@ class PCRScrimmage:
         for iter_player_id in self.now_playing_players:  # 每丢1次色子为一个回合
             iter_player = self.getPlayerObj(iter_player_id)
             iter_player.deleteInvalidBuff()
-            iter_player.attrChange(Attr.NOW_TP, ONE_ROUND_TP)
+            if iter_player.passive == PASSIVE_SKIP:
+                iter_player.attrChange(Attr.NOW_TP, ONE_ROUND_TP + 5 * iter_player.has_skipped_turn)
+            else:
+                iter_player.attrChange(Attr.NOW_TP, ONE_ROUND_TP)
             iter_player.buffTriggerByTriggerType(BuffTriggerType.Normal)
             iter_player.buffTriggerByTriggerType(BuffTriggerType.Turn)
             if iter_player_id == player_id:
@@ -994,6 +991,20 @@ class PCRScrimmage:
             if use_skill_player.attr[Attr.NOW_TP] < skill_effect[EFFECT_TP_REQUEST]:
                 return RET_ERROR, '未满足技能释放要求'
 
+        if EFFECT_SKIP_JUDGE in skill_effect:
+            if use_skill_player.has_skipped_turn < goal_player.has_skipped_turn:
+                skill_effect[EFFECT_HURT] = (100, Attr.ATTACK, 0, 1.8, False)
+            else:
+                skill_effect[EFFECT_ATTR_CHANGE] = [(Attr.DEFENSIVE, -1, Attr.DEFENSIVE, 0.6)]
+
+        if EFFECT_UNKNOWN in skill_effect:
+            if use_skill_player.unknown == 1:
+                return RET_ERROR, '你已经处于迷糊状态了！请选择其他技能'
+            else:
+                use_skill_player.unknown = 1
+                back_msg.append(f'{use_player_name}进入迷糊状态了！')
+
+
         # aoe效果
         if EFFECT_AOE in skill_effect:
             aoe_dist = skill_effect[EFFECT_AOE][0]  # aoe范围
@@ -1144,7 +1155,7 @@ class PCRScrimmage:
                     for i in range(0,attack_num):
                         num2, crit_flag2 = self.hurtCalculate(skill_effect, use_skill_player, goal_player, back_msg)
                         if EFFECT_ATTACK_BURST in skill_effect:
-                            num2 = math.floor(num2 * (1.12 ** (i+1)))
+                            num2 = math.floor(num2 * (1.2 ** (i+1)))
                         num2 = goal_player.beHurt(num2)
                         if goal_player.costtp == 1:
                             back_msg.append(f'{use_player_name}发起第{i+2}次攻击,{crit_flag2 and "暴击！" or ""}{goal_player_name}的tp值降低了{abs(num2)}点')
@@ -1350,7 +1361,8 @@ class PCRScrimmage:
         is_real = skill_effect[EFFECT_HURT][4]  # 是否是真实伤害
 
         use_skill_player.buffTriggerByTriggerType(BuffTriggerType.Attack)
-        crit_flag = random.choice(range(0, MAX_CRIT)) < use_skill_player.attr[Attr.CRIT]
+        # 决定角色是否暴击，受EFFECT_SKIP_CRIT影响
+        crit_flag = random.choice(range(0, MAX_CRIT)) < (use_skill_player.attr[Attr.CRIT] if EFFECT_SKIP_CRIT not in skill_effect else use_skill_player.attr[Attr.CRIT] + (skill_effect[EFFECT_SKIP_CRIT]) * use_skill_player.has_skipped_turn)
 
         # 复仇
         if EFFECT_REVENGE in skill_effect:
@@ -1361,6 +1373,8 @@ class PCRScrimmage:
             num = num + addition_goal.attr[addition_type] * addition_prop
         if use_skill_player.attr[Attr.CRIT] != 0 and crit_flag:  # 计算暴击
             num *= use_skill_player.attr[Attr.CRIT_HURT]
+        if EFFECT_SKIP_TRUEDAMAGE in skill_effect and use_skill_player.has_skipped_turn >= skill_effect[EFFECT_SKIP_TRUEDAMAGE] :
+            is_real = True
         if not is_real:  # 如果是真实伤害则不计算目标的防御
             goal_player_def = goal_player.attr[Attr.DEFENSIVE]  # 目标防御力
             num = hurt_defensive_calculate(num, goal_player_def)  # 计算目标防御力后的数值
@@ -1900,10 +1914,20 @@ async def use_skill(bot, ev: GroupMessageEvent):
 
     skill_id = ''
     goal_player_id = ''
+    player = scrimmage.getNowTurnPlayerObj()
     if match:
         skill_id = match.group(1)
         goal_player_id = match.group(3) or '0'
     else:
+        if player.unknown == 1 and player.passive == PASSIVE_SKIP:
+            player.unknown = 0
+        # 跳过技能阶段，结算刀酱的双暴
+        player.has_skipped_turn += 1
+        if player.passive == PASSIVE_SKIP:
+            player.attrChange(Attr.CRIT, 15)
+            player.attrChange(Attr.CRIT_HURT, 0.3)
+            player_name = uid2card(player.user_id, scrimmage.user_card_dict)
+            await bot.send(ev, f"由于跳过了本回合的技能阶段，{player_name}的暴击率与暴击伤害上升了！")
         skill_id = '0'
         goal_player_id = '0'
 
@@ -1917,6 +1941,20 @@ async def use_skill(bot, ev: GroupMessageEvent):
     ret = await scrimmage.useSkill(skill_id, uid, goal_player_id, bot, ev)
     if ret == RET_ERROR:
         return
+    if skill_id != 0:
+        if player.unknown == 1 and player.passive == PASSIVE_SKIP:
+            if player.has_skipped_turn != 0 and skill_id != 4:
+                player.has_skipped_turn -= 1
+            player.attrChange(Attr.CRIT, -15)
+            player.attrChange(Attr.CRIT_HURT, -0.3)
+            await bot.send(ev, f"回合结束剩余{WAIT_TIME * (STAGE_WAIT_TIME - scrimmage.player_satge_timer)}秒，请继续使用技能")
+            return
+
+        if player.passive == PASSIVE_SKIP:
+            num = player.has_skipped_turn
+            player.attrChange(Attr.CRIT, -num * 15)
+            player.attrChange(Attr.CRIT_HURT, -num * 0.3)
+        player.has_skipped_turn = 0
 
     # 回合切换
     result = scrimmage.turnChange()
@@ -2043,7 +2081,7 @@ async def game_help_all_role(bot, ev: GroupMessageEvent):
 
 @version.handle()
 async def _(bot, ev: GroupMessageEvent):
-    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.8.3\n更新时间：2023-3-8\n—————————\n正式服:\n当前版本：1.8.1\n更新时间：2023-3-8")
+    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.9.1\n更新时间：2023-5-3\n—————————\n正式服:\n当前版本：1.8.1\n更新时间：2023-3-8")
 
 @skillrate.handle()
 async def _(bot, ev: GroupMessageEvent):

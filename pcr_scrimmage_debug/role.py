@@ -57,6 +57,8 @@ EFFECT_HURT = "hurt"  # 造成伤害	tuple元组 (数值，加成类型，加成
 EFFECT_ELIMINATE = "eliminate"  # 斩杀效果，目标生命值越低造成的伤害越高		tuple元组 (目标生命值降低比例, 伤害数值)
 EFFECT_STAND = "stand"  # 背水效果，自身生命值越低造成的伤害越高		tuple元组 (自身生命值降低比例, 伤害数值)
 EFFECT_LIFESTEAL = "life_steal"  # 生命偷取	float 伤害-生命值之间的转换比例
+EFFECT_SKIP_TRUEDAMAGE = "skip_truedamage" # 使用技能前跳过特定回合数，则变为真实伤害       number 需要跳过的回合数
+EFFECT_SKIP_CRIT = "skip_crit" # 使用技能前每跳过一个回合，此次暴击率增加     number 暴击率增加的数值
 # 需要EFFECT_HURT作为前置	↑
 
 EFFECT_BUFF = "buff"  # buff效果		list[tuple,tuple] [(BuffType.xx, 数值, 可触发次数), (...)]
@@ -95,6 +97,10 @@ EFFECT_SWEET_LOCKTURN = "sweet_lockturn"
 EFFECT_DOUBLESPEED = "doublespeed"
 EFFECT_ATTACK_BURST = "attack_burst"
 EFFECT_HEALTH_DOWN = "health_down"
+EFFECT_SKIP_JUDGE = "skip_judge" # 刀酱特有技能效果，不作为其他技能的效果使用
+EFFECT_UNKNOWN = "unknown" # 刀酱特有技能效果，不作为其他技能的效果使用
+
+
 
 EFFECT_DIZZINESS = "dizziness"  # 眩晕效果，跳过特定玩家一回合 number
 
@@ -116,6 +122,7 @@ PASSIVE_REBORN = "reborn"
 PASSIVE_HEALTHTP = "healthtp"
 PASSIVE_SWEETIE = "sweetie"
 PASSIVE_ATTACKSPEED = "attackspeed"
+PASSIVE_SKIP = "skip"
 
 from .attr import Attr
 from .buff import BuffType
@@ -2636,14 +2643,14 @@ ROLE = {
         "active_skills": [
             {
                 "name": "你不行",
-                "text": "对目标造成0(+0.7自身防御力)伤害，并增加10点防御力",
+                "text": "对目标造成0(+0.7自身防御力)伤害，并增加15点防御力",
                 "tp_cost": 10,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
                 "effect": {
                     EFFECT_HURT: (0, Attr.DEFENSIVE, 0, 0.7, False),
-                    EFFECT_ATTR_CHANGE: (Attr.DEFENSIVE, 10, 0, 0)
+                    EFFECT_ATTR_CHANGE: [(Attr.DEFENSIVE, 15, 0, 0)],
                 }
             },
             {
@@ -2661,7 +2668,7 @@ ROLE = {
             {
                 "name": "行不行啊细狗",
                 "text": "使用此技能时，攻击速度视为原来的两倍；对目标造成10(+1.0自身防御力)伤害，技能期间每攻击一次，目标防御力降低20%，下一次攻击的伤害增加20%；若将目标击倒，恢复500点生命值",
-                "tp_cost": 80,
+                "tp_cost": 70,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
@@ -2670,6 +2677,73 @@ ROLE = {
                     EFFECT_DOUBLESPEED: 1,
                     EFFECT_ATTACK_BURST: 1,
                     EFFECT_HEALTH_DOWN: 500
+                }
+            }
+        ],
+        "passive_skills": [
+
+        ]
+    },
+    5107: {
+        "name": "刀酱",
+        "position": POSITION_ATTACK,
+        "passive": PASSIVE_SKIP,
+        "passive_text": "刀酱每跳过一次技能发动阶段，都能获得15%的暴击率与0.3倍的暴击伤害，直到使用技能后，清空此加成；刀酱的每一个已跳过回合，都将使其丢色子时获得额外的5tp",
+
+        "health": 1000,
+        "distance": 5,
+        "attack": 100,
+        "defensive": 70,
+        "crit": 15,
+        "tp": 0,
+
+        "active_skills": [
+            {
+                "name": "普通攻击",
+                "text": "对目标造成0(+0.9自身攻击力)伤害，使用此技能前每跳过一个回合，此技能的暴击率提升10%",
+                "tp_cost": 10,
+                "trigger": TRIGGER_SELECT_EXCEPT_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_HURT: (0, Attr.ATTACK, 0, 0.9, False),
+                    EFFECT_SKIP_CRIT: 10,
+                }
+            },
+            {
+                "name": "好果汁",
+                "text": "对目标造成80(+1.4自身攻击力)伤害，使用此技能前若已经跳过2个或更多回合，此伤害改为真实伤害",
+                "tp_cost": 30,
+                "trigger": TRIGGER_SELECT_EXCEPT_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_HURT: (80, Attr.ATTACK, 0, 1.4, False),
+                    EFFECT_SKIP_TRUEDAMAGE: 2,
+                }
+            },
+            {
+                "name": "你比泰深都牛批",
+                "text": "比较自身与目标已经跳过的回合数，若自身跳过回合数更低，则对目标造成100(+1.8自身攻击力)伤害；否则降低目标60%防御力",
+                "tp_cost": 45,
+                "trigger": TRIGGER_SELECT_EXCEPT_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_SKIP_JUDGE: 1,
+                }
+            },
+            {
+                "name": "我...我不到啊",
+                "text": "(此技能需要70tp才可以使用)攻击力提升50点，进入迷糊状态，期间可以无限次发动任意技能(此技能除外)，直到发送“跳过”为止(此回合仍然视为已跳过)；迷糊状态期间每使用一次技能，已跳过回合数-1",
+                "tp_cost": 0,
+                "trigger": TRIGGER_ME,
+                "passive": [],
+
+                "effect": {
+                    EFFECT_TP_REQUEST: 70,
+                    EFFECT_ATTR_CHANGE: [(Attr.ATTACK, 50, 0, 0)],
+                    EFFECT_UNKNOWN: 1,
                 }
             }
         ],

@@ -1945,8 +1945,8 @@ async def use_skill(bot, ev: GroupMessageEvent):
         if player.unknown == 1 and player.passive == PASSIVE_SKIP:
             if player.has_skipped_turn != 0 and skill_id != 4:
                 player.has_skipped_turn -= 1
-            player.attrChange(Attr.CRIT, -15)
-            player.attrChange(Attr.CRIT_HURT, -0.3)
+                player.attrChange(Attr.CRIT, -15)
+                player.attrChange(Attr.CRIT_HURT, -0.3)
             await bot.send(ev, f"回合结束剩余{WAIT_TIME * (STAGE_WAIT_TIME - scrimmage.player_satge_timer)}秒，请继续使用技能")
             return
 

@@ -2345,7 +2345,7 @@ ROLE = {
             {
                 "name": "喝哎！",
                 "text": "在初始形态与答辩形态之间切换，普通形态具有更强的生存能力，答辩形态则擅长绳之以法，使用此技能时若tp已达到40则获得一个额外回合",
-                "tp_cost": 0,
+                "tp_cost": 10,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 
@@ -2357,7 +2357,7 @@ ROLE = {
                     ],
                     EFFECT_BUFF: [(BuffType.heai, 4, 99999)],
                     EFFECT_SKILL_CHANGE: (BuffType.heai, [0]),
-                    EFFECT_TP_LOCKTURN: 40,
+                    EFFECT_TP_LOCKTURN: 30,
                 }
             },
             {
@@ -2515,13 +2515,13 @@ ROLE = {
         "active_skills": [
             {
                 "name": "普通攻击",
-                "text": "对目标造成0(+0.6自身已损失生命值)伤害，并将伤害的30%转化为生命值",
+                "text": "对目标造成50(+1.0自身防御力)伤害，并将伤害的30%转化为生命值",
                 "tp_cost": 50,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
                 "effect": {
-                    EFFECT_HURT: (0, Attr.COST_HEALTH, 0, 0.6, False),
+                    EFFECT_HURT: (0, Attr.DEFENSIVE, 0, 1.0, False),
                     EFFECT_LIFESTEAL: 0.3
                 }
             },
@@ -2538,7 +2538,7 @@ ROLE = {
             },
             {
                 "name": "俺滴图图啊！",
-                "text": "(该技能需要tp值为100时才能使用)最大生命值降低1000，在本局大乱斗中，图图受到攻击时不再扣除生命值，而改为扣除伤害0.1倍的等量tp值；当tp值归0时，图图出局",
+                "text": "(该技能需要tp值为100时才能使用)最大生命值降低1000，在本局大乱斗中，图图受到攻击时不再扣除生命值，而改为扣除伤害0.075倍的等量tp值；当tp值归0时，图图出局",
                 "tp_cost": 1000,
                 "trigger": TRIGGER_ME,
                 "passive": [],
@@ -2557,7 +2557,7 @@ ROLE = {
         "name": "嘉然",
         "position": POSITION_SPECIAL,
         "passive": PASSIVE_SWEETIE,
-        "passive_text": "嘉然拥有嘉心糖的支持(最多10个)，游戏开始时获得3个；每一个嘉心糖可以为嘉然提供150点生命值上限，30点攻击力，30点防御力，以及5%的暴击率。嘉然的嘉心糖数量与生命值上限相关，嘉然每失去150点生命值，就会失去一个嘉心糖",
+        "passive_text": "嘉然拥有嘉心糖的支持(最多10个)，游戏开始时获得3个；每一个嘉心糖可以为嘉然提供150点生命值上限，30点攻击力，30点防御力，以及10%的暴击率。嘉然的嘉心糖数量与生命值上限相关，嘉然每失去150点生命值，就会失去一个嘉心糖",
 
         "health": 500,
         "distance": 6,
@@ -2582,20 +2582,20 @@ ROLE = {
             },
             {
                 "name": "开播",
-                "text": "嘉然立即获得2个嘉心糖，并在接下来的2个自我回合内每回合获得1个嘉心糖",
+                "text": "嘉然立即获得1个嘉心糖，并在接下来的2个自我回合内每回合获得2个嘉心糖",
                 "tp_cost": 25,
                 "trigger": TRIGGER_ME,
                 "passive": [],
 
                 "effect": {
-                    EFFECT_GET_SWEETIE: 2,
-                    EFFECT_BUFF:[(BuffType.Sweetie, 1, 2)]
+                    EFFECT_GET_SWEETIE: 1,
+                    EFFECT_BUFF:[(BuffType.Sweetie, 2, 2)]
                 }
             },
             {
                 "name": "顿顿解馋",
-                "text": "嘉然攻击某个目标，对其造成100(+1.5自身攻击力)伤害，并使其获得猫中毒状态，持续3个自我回合(不可叠加)；在猫中毒状态下的角色每当受到攻击伤害时，嘉然都将获得1个嘉心糖并从该玩家处抢夺10点tp",
-                "tp_cost": 40,
+                "text": "嘉然攻击某个目标，对其造成100(+1.5自身攻击力)伤害，并使其获得猫中毒状态，持续3个自我回合(不可叠加)；在猫中毒状态下的角色每当受到攻击伤害时，嘉然都将获得3个嘉心糖并从该玩家处抢夺10点tp",
+                "tp_cost": 30,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
@@ -2606,13 +2606,13 @@ ROLE = {
             },
             {
                 "name": "番茄炒蛋拳！",
-                "text": "嘉然用尽全身力气挥出著名的番茄炒蛋拳，对目标造成250(+0.5自身攻击力)伤害，并消耗全部的嘉心糖，每消耗1个，此伤害提升20%(嘉然的面板按消耗前结算)；如果消耗了5个或更多嘉心糖，则嘉然锁定1个回合",
-                "tp_cost": 90,
+                "text": "嘉然用尽全身力气挥出著名的番茄炒蛋拳，对目标造成200(+1.0自身攻击力)伤害，并消耗全部的嘉心糖，每消耗1个，此伤害提升20%(嘉然的面板按消耗前结算)；如果消耗了3个或更多嘉心糖，则嘉然锁定1个回合并获得2个嘉心糖",
+                "tp_cost": 75,
                 "trigger": TRIGGER_ME,
                 "passive": [0],
 
                 "effect": {
-                    EFFECT_SWEET_LOCKTURN: 5
+                    EFFECT_SWEET_LOCKTURN: 3
 
                 }
             },
@@ -2621,7 +2621,7 @@ ROLE = {
             {
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "effect": {
-                    EFFECT_HURT: (300, Attr.ATTACK, 0, 0.5, False),
+                    EFFECT_HURT: (200, Attr.ATTACK, 0, 1.0, False),
                     EFFECT_SWEETBUFF: 1.2
                 }
             }
@@ -2643,14 +2643,15 @@ ROLE = {
         "active_skills": [
             {
                 "name": "你不行",
-                "text": "对目标造成0(+0.7自身防御力)伤害，并增加15点防御力",
-                "tp_cost": 10,
+                "text": "对目标造成0(+0.7自身防御力)伤害，并增加25点防御力和攻击速度",
+                "tp_cost": 15,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
                 "effect": {
                     EFFECT_HURT: (0, Attr.DEFENSIVE, 0, 0.7, False),
-                    EFFECT_ATTR_CHANGE: [(Attr.DEFENSIVE, 15, 0, 0)],
+                    EFFECT_ATTR_CHANGE: [(Attr.DEFENSIVE, 25, 0, 0),
+                                         (Attr.ATTACK_SPEED, 25, 0, 0)],
                 }
             },
             {
@@ -2667,13 +2668,13 @@ ROLE = {
             },
             {
                 "name": "行不行啊细狗",
-                "text": "使用此技能时，攻击速度视为原来的两倍；对目标造成10(+1.0自身防御力)伤害，技能期间每攻击一次，目标防御力降低20%，下一次攻击的伤害增加20%；若将目标击倒，恢复500点生命值",
+                "text": "使用此技能时，攻击速度视为原来的两倍；对目标造成70(+1.0自身防御力)伤害，技能期间每攻击一次，目标防御力降低20%，下一次攻击的伤害增加20%；若将目标击倒，恢复500点生命值",
                 "tp_cost": 70,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
                 "effect": {
-                    EFFECT_HURT: (10, Attr.DEFENSIVE, 0, 1.0, False),
+                    EFFECT_HURT: (70, Attr.DEFENSIVE, 0, 1.0, False),
                     EFFECT_DOUBLESPEED: 1,
                     EFFECT_ATTACK_BURST: 1,
                     EFFECT_HEALTH_DOWN: 500
@@ -2700,32 +2701,34 @@ ROLE = {
         "active_skills": [
             {
                 "name": "普通攻击",
-                "text": "对目标造成0(+0.9自身攻击力)伤害，使用此技能前每跳过一个回合，此技能的暴击率提升10%",
+                "text": "对目标造成0(+0.9自身攻击力)伤害，并将所造成伤害的15%转化为生命值；使用此技能前每跳过一个回合，此技能的暴击率提升10%",
                 "tp_cost": 10,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
                 "effect": {
                     EFFECT_HURT: (0, Attr.ATTACK, 0, 0.9, False),
+                    EFFECT_LIFESTEAL: 0.15,
                     EFFECT_SKIP_CRIT: 10,
                 }
             },
             {
                 "name": "好果汁",
-                "text": "对目标造成80(+1.4自身攻击力)伤害，使用此技能前若已经跳过2个或更多回合，此伤害改为真实伤害",
+                "text": "对目标造成80(+1.5自身攻击力)伤害，并将所造成伤害的30%转化为生命值；使用此技能前若已经跳过2个或更多回合，此伤害改为真实伤害",
                 "tp_cost": 30,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 
                 "effect": {
-                    EFFECT_HURT: (80, Attr.ATTACK, 0, 1.4, False),
+                    EFFECT_HURT: (80, Attr.ATTACK, 0, 1.5, False),
+                    EFFECT_LIFESTEAL: 0.3,
                     EFFECT_SKIP_TRUEDAMAGE: 2,
                 }
             },
             {
                 "name": "你比泰深都牛批",
                 "text": "比较自身与目标已经跳过的回合数，若自身跳过回合数更低，则对目标造成100(+1.8自身攻击力)伤害；否则降低目标60%防御力",
-                "tp_cost": 45,
+                "tp_cost": 30,
                 "trigger": TRIGGER_SELECT_EXCEPT_ME,
                 "passive": [],
 

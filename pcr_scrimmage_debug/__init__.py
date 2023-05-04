@@ -361,7 +361,7 @@ class Role:
     def beHurt(self, num):
         if self.costtp == 1:
             num = self.buffTriggerByTriggerType(BuffTriggerType.Hurt, num)
-            num = math.floor(num * 0.1)
+            num = math.floor(num * 0.075)
             self.attrChange(Attr.NOW_TP, num)
         else:
             num = self.buffTriggerByTriggerType(BuffTriggerType.Hurt, num)
@@ -484,11 +484,14 @@ class Role:
             self.attr[Attr.NOW_HEALTH] += num
         else:
             self.attr[Attr.MAX_HEALTH] = maxhealth
+            if self.attr[Attr.NOW_HEALTH] > self.attr[Attr.MAX_HEALTH]:
+                # 当前生命值不能超过最大生命值
+                self.attr[Attr.NOW_HEALTH] = self.attr[Attr.MAX_HEALTH]
         if self.lastsweetie == -1:
             attack = (30 * self.sweetie)
             self.attr[Attr.ATTACK] = role_data['attack'] + attack
             self.attr[Attr.DEFENSIVE] = role_data['defensive'] + (30 * self.sweetie)
-            self.attr[Attr.CRIT] = role_data['crit'] + (5 * self.sweetie)
+            self.attr[Attr.CRIT] = role_data['crit'] + (10 * self.sweetie)
             if self.attr[Attr.CRIT] > MAX_CRIT:
                 self.attr[Attr.CRIT] = MAX_CRIT
             self.lastsweetie = self.sweetie
@@ -497,7 +500,7 @@ class Role:
             if num != 0:
                 self.attrChange(Attr.ATTACK, (30*num))
                 self.attrChange(Attr.DEFENSIVE, (30*num))
-                self.attrChange(Attr.CRIT, (5*num))
+                self.attrChange(Attr.CRIT, (10*num))
                 self.lastsweetie = self.sweetie
 
 
@@ -1167,22 +1170,22 @@ class PCRScrimmage:
                             back_msg.append(f'{goal_player_name}的防御力下降了{abs(defdown_num)}点')
                         if num2 < 0 < goal_player.catpoison:
                             diana_player = self.getDianaObj()
-                            diana_player.sweetie += 1
+                            diana_player.sweetie += 3
                             diana_player.sweetiecalculate(True)
                             goal_player.attrChange(Attr.NOW_TP, -10)
                             diana_player.attrChange(Attr.NOW_TP, 10)
                             diana_player_name = uid2card(diana_player.user_id, self.user_card_dict)
                             back_msg.append(
-                                f'由于{goal_player_name}正处于猫中毒状态，{diana_player_name}获得了1个嘉心糖并从该玩家处抢夺了10点tp')
+                                f'由于{goal_player_name}正处于猫中毒状态，{diana_player_name}获得了3个嘉心糖并从该玩家处抢夺了10点tp')
 
             if num < 0 < goal_player.catpoison:
                 diana_player = self.getDianaObj()
-                diana_player.sweetie += 1
+                diana_player.sweetie += 3
                 diana_player.sweetiecalculate(True)
                 goal_player.attrChange(Attr.NOW_TP, -10)
                 diana_player.attrChange(Attr.NOW_TP, 10)
                 diana_player_name = uid2card(diana_player.user_id, self.user_card_dict)
-                back_msg.append(f'由于{goal_player_name}正处于猫中毒状态，{diana_player_name}获得了1个嘉心糖并从该玩家处抢夺了10点tp')
+                back_msg.append(f'由于{goal_player_name}正处于猫中毒状态，{diana_player_name}获得了3个嘉心糖并从该玩家处抢夺了10点tp')
 
             if goal_player.passive == PASSIVE_ATTACKSPEED:
                 num3,crit_flag3 = self.hurtCalculate(skill_effect,goal_player,use_skill_player,back_msg,True)
@@ -1221,14 +1224,20 @@ class PCRScrimmage:
 
         # 消耗嘉心糖锁定回合效果
         if EFFECT_SWEET_LOCKTURN in skill_effect:
-            num = use_skill_player.sweetie
-            use_skill_player.sweetie = 0
-            use_skill_player.sweetiecalculate(True)
-            back_msg.append(f'{use_player_name}消耗了{num}个嘉心糖')
             lockrequirement = skill_effect[EFFECT_SWEET_LOCKTURN]
+            num = use_skill_player.sweetie
+            back_msg.append(f'{use_player_name}消耗了{num}个嘉心糖')
             if num >= lockrequirement:
                 self.lock_turn = 1
-                back_msg.append(f'由于消耗数量达到了{lockrequirement}个或更多，{use_player_name}锁定了一回合')
+                use_skill_player.sweetie = 2
+                use_skill_player.sweetiecalculate(True)
+                back_msg.append(f'由于消耗数量达到了{lockrequirement}个或更多，{use_player_name}锁定了一回合并获得了2个嘉心糖')
+            else:
+                use_skill_player.sweetie = 0
+                use_skill_player.sweetiecalculate(True)
+
+
+
 
 
         # tp达到指定值时锁定回合
@@ -2081,7 +2090,7 @@ async def game_help_all_role(bot, ev: GroupMessageEvent):
 
 @version.handle()
 async def _(bot, ev: GroupMessageEvent):
-    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.9.1\n更新时间：2023-5-3\n—————————\n正式服:\n当前版本：1.8.1\n更新时间：2023-3-8")
+    await version.send("大乱斗版本信息\n—————————\n测试服:\n当前版本：1.9.2\n更新时间：2023-5-4\n—————————\n正式服:\n当前版本：1.8.1\n更新时间：2023-3-8")
 
 @skillrate.handle()
 async def _(bot, ev: GroupMessageEvent):

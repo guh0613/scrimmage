@@ -37,9 +37,63 @@ from nonebot.matcher import Matcher
 from models.bag_user import BagUser
 
 from . import chara
-from .utils.utils import (init_data, load_skill_data, create_skill_data, get_skill_level, save_skill_data, update_skill_data, get_skill_bonus
-                            , SKILL_RATE_LEGEND, SKILL_RATE_MASTER, SKILL_RATE_ADVANCED, SKILL_RATE_SKILFUL, SKILL_RATE_ONHAND, SKILL_RATE_NEW
-                          , getkey)
+from .utils.utils import (
+    init_data,
+    load_skill_data,
+    create_skill_data,
+    get_skill_level,
+    save_skill_data,
+    update_skill_data,
+    get_skill_bonus,
+    SKILL_RATE_LEGEND,
+    SKILL_RATE_MASTER,
+    SKILL_RATE_ADVANCED,
+    SKILL_RATE_SKILFUL,
+    SKILL_RATE_ONHAND,
+    SKILL_RATE_NEW,
+    getkey,
+)
+from .common import (
+    uid2card,
+    GOLD_DICT,
+    SKILL_RATE_DICT,
+    hurt_defensive_calculate,
+    OFFSET_X,
+    OFFSET_Y,
+    RUNWAY_LINE_WDITH,
+    STATU_LINE_WDITH,
+    COLOR_BLACK,
+    COLOR_WRITE,
+    COLOR_RED,
+    COLOR_GREEN,
+    COLOR_BLUE,
+    COLOR_CAM_GREEN,
+    COLOR_CAM_BLUE,
+    NOW_STATU_WAIT,
+    NOW_STATU_SELECT_ROLE,
+    NOW_STATU_OPEN,
+    NOW_STATU_END,
+    NOW_STATU_WIN,
+    NOW_STAGE_WAIT,
+    NOW_STAGE_DICE,
+    NOW_STAGE_SKILL,
+    NOW_STAGE_OUT,
+    NOW_STAGE_FAKEOUT,
+    MAX_PLAYER,
+    MAX_CRIT,
+    MAX_TP,
+    MAX_DIST,
+    ONE_ROUND_TP,
+    ROUND_DISTANCE,
+    ROUND_ATTACK,
+    HIT_DOWN_TP,
+    RET_ERROR,
+    RET_NORMAL,
+    RET_SCUESS,
+    WAIT_TIME,
+    PROCESS_WAIT_TIME,
+    STAGE_WAIT_TIME,
+)
 from .attr import Attr, AttrTextChange
 from .buff import BuffEffectType, BuffTriggerType, Buff, BuffType
 from .runway_case import (CASE_NONE, CASE_ATTACK, CASE_DEFENSIVE, CASE_HEALTH,
@@ -129,86 +183,6 @@ async def get_user_card_dict(bot, group_id):
     for m in mlist:
         d[m['user_id']] = m['card'] if m['card'] != '' else m['nickname']
     return d
-
-
-def uid2card(uid, user_card_dict):
-    return str(uid) if uid not in user_card_dict.keys() else user_card_dict[uid]
-
-##结算时可以获得的金币
-GOLD_DICT = {
-    2:[200, 100],
-    3:[600, 400, 200],
-    4:[1200, 900, 600, 300]
-}
-
-SKILL_RATE_DICT = {
-    2:[1, 0],
-    3:[2.5, 1, 0],
-    4:[3.5, 2, 1.5, 1]
-}
-
-# 防御力计算机制。
-# 100点防御力内，每1点防御力增加0.15%伤害减免；
-# 到达100点防御力后，每一点防御力只可获得0.12%伤害减免；
-# 100点防御力后，每1点防御力增加0.05%伤害减免；
-# 最高有效防御力为1000
-# （防御力可无限提升，但最高只能获得57%伤害减免）
-def hurt_defensive_calculate(hurt, defensive):
-    percent = 0.0
-    if defensive <= 100:
-        percent = defensive * 0.0015
-    else:
-        if defensive <= 1000:
-            percent = 100 * 0.0015 + (defensive - 100) * 0.0005
-        else:
-            percent = 100 * 0.0012 + 900 * 0.0005
-    return hurt - hurt * percent
-
-
-###显示偏移###	（可以改）
-OFFSET_X = 45  # 整体右移
-OFFSET_Y = 50  # 整体下移
-
-###线宽###		（别改）
-RUNWAY_LINE_WDITH = 4  # 跑道线宽
-STATU_LINE_WDITH = 2  # 状态条线宽 血条tp条
-
-###常用颜色###
-COLOR_BLACK = (0, 0, 0)
-COLOR_WRITE = (255, 255, 255)
-COLOR_RED = (255, 0, 0)
-COLOR_GREEN = (0, 255, 0)
-COLOR_BLUE = (0, 0, 255)
-COLOR_CAM_GREEN = (30, 230, 100)  # 血条填充色
-COLOR_CAM_BLUE = (30, 144, 255)  # tp条填充色
-
-###当前房间状态###
-NOW_STATU_WAIT = 0
-NOW_STATU_SELECT_ROLE = 1
-NOW_STATU_OPEN = 2
-NOW_STATU_END = 3
-NOW_STATU_WIN = 4
-
-###当前玩家处于什么阶段###
-NOW_STAGE_WAIT = 0  # 等待
-NOW_STAGE_DICE = 1  # 丢色子
-NOW_STAGE_SKILL = 2  # 释放技能
-NOW_STAGE_OUT = 3  # 出局
-NOW_STAGE_FAKEOUT = 4 # 假死
-
-MAX_PLAYER = 4  # 最大玩家数量
-MAX_CRIT = 100  # 最大暴击
-MAX_TP = 100  # tp值上限
-MAX_DIST = 15  # 最大攻击距离
-
-ONE_ROUND_TP = 10  # 单回合获得tp量
-ROUND_DISTANCE = 2  # 每隔x回合增加的攻击距离(x为当前存活人数)
-ROUND_ATTACK = 10  # 每隔x回合增加的攻击力
-HIT_DOWN_TP = 20  # 击倒获得的tp
-
-RET_ERROR = -1  # 错误
-RET_NORMAL = 0
-RET_SCUESS = 1  # 成功
 
 
 # 角色
@@ -1571,10 +1545,6 @@ class manager:
         return self.playing[gid] if gid in self.playing else None
 
 mgr = manager()
-WAIT_TIME = 3  # 每x秒检查一次房间状态
-PROCESS_WAIT_TIME = 1  # 避免发送太快增加的缓冲时间
-
-STAGE_WAIT_TIME = 30  # 玩家阶段等待时间，超过这个时间判负。
 
 
 # 实际时间是 STAGE_WAIT_TIME * WAIT_TIME
